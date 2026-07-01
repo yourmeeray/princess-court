@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>여섯 보석의 궁정</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Song+Myung&family=Nanum+Myeongjo:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0C0B16; --velvet:#181126; --velvet-2:#221733;
+    --parch:#EFE6D6; --parch-dim:#BFB29A;
+    --gold:#D8B978; --gold-bright:#F1D99C; --gold-deep:#A8843E;
+    --line:rgba(216,185,120,.28);
+    --g1:#D96A7E; --g2:#E0A95E; --g3:#E08C6B; --g4:#E8E0CE; --g5:#6F93C9; --g6:#A77FC9;
+    --ok:#7FBF8F; --warn:#D98C5F; --bad:#D96A7E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1000px 700px at 50% -10%, var(--velvet-2) 0%, rgba(34,23,51,0) 60%), var(--ink);
+    color:var(--parch); font-family:"Nanum Myeongjo",serif; min-height:100vh;
+    -webkit-font-smoothing:antialiased; padding:26px 16px 60px;
+  }
+  .wrap{max-width:900px;margin:0 auto}
+  .crest{text-align:center;margin-bottom:22px}
+  .crest .t{font-family:"Song Myung",serif;font-size:clamp(20px,5vw,30px);color:var(--gold-bright);letter-spacing:.14em}
+  .crest .s{font-size:11px;letter-spacing:.4em;color:var(--parch-dim);margin-top:6px}
+  .card{background:linear-gradient(180deg,rgba(216,185,120,.06),rgba(216,185,120,.015));
+    border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+  .muted{color:var(--parch-dim)}
+  .badge{display:inline-block;font-size:12px;letter-spacing:.12em;color:var(--gold);
+    border:1px solid var(--line);border-radius:20px;padding:4px 12px}
+  h2.sec{font-family:"Song Myung",serif;color:var(--gold-bright);font-size:18px;
+    letter-spacing:.08em;margin-bottom:14px}
+  button{font-family:"Nanum Myeongjo",serif;cursor:pointer;border-radius:10px;
+    border:1px solid var(--line);background:rgba(216,185,120,.08);color:var(--parch);
+    padding:9px 14px;font-size:14px;transition:.2s}
+  button:hover{border-color:var(--gold);background:rgba(216,185,120,.16)}
+  button.gold{background:var(--gold);color:#241a06;border-color:var(--gold);font-weight:700}
+  button.sm{padding:5px 10px;font-size:12.5px}
+  input,select{font-family:"Nanum Myeongjo",serif;background:rgba(0,0,0,.25);
+    color:var(--parch);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:14px}
+  input[type=number]{width:52px;text-align:center}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--velvet-2);border:1px solid var(--gold);color:var(--parch);
+    padding:10px 18px;border-radius:24px;font-size:13px;opacity:0;transition:.3s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  /* player */
+  .hexwrap{display:flex;justify-content:center;margin:6px 0 14px}
+  .gemrow{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed rgba(216,185,120,.15)}
+  .gemrow b{color:var(--parch)}
+  .mission{border:1px solid var(--g6);background:rgba(167,127,201,.08);border-radius:14px;padding:18px;margin-top:6px}
+  .mission .h{font-family:"Song Myung",serif;color:#C9A6E4;letter-spacing:.08em;margin-bottom:8px}
+  .vote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:8px}
+  .vote-grid button{width:100%}
+  .vote-grid button.on{background:var(--gold);color:#241a06;border-color:var(--gold);font-weight:700}
+  /* admin table */
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:760px}
+  th,td{border:1px solid rgba(216,185,120,.16);padding:7px 8px;text-align:center;white-space:nowrap}
+  th{color:var(--gold);font-weight:400;letter-spacing:.05em;position:sticky;top:0;background:var(--velvet)}
+  td.name{text-align:left;white-space:normal}
+  .rank1{color:var(--gold-bright);font-weight:700}
+  .pill{font-size:11px;padding:2px 8px;border-radius:12px;border:1px solid var(--line)}
+  .link{font-size:11.5px;color:var(--gold);word-break:break-all}
+  .center{text-align:center}
+  .toggle{display:flex;gap:8px;align-items:center}
+  .hint{font-size:12px;color:var(--parch-dim);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="crest"><div class="t">여섯 보석의 궁정</div><div class="s">THE COURT OF SIX JEWELS</div></div>
+  <div class="card"><p class="muted center">불러오는 중…</p></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== 설정: 배포한 Apps Script /exec URL 을 여기에 붙여넣으세요 ===== */
+const API_URL = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE";
+
+const GEMS = [
+  {k:'grace', ko:'우아', c:'var(--g1)'},
+  {k:'craft', ko:'솜씨', c:'var(--g2)'},
+  {k:'taste', ko:'미각', c:'var(--g3)'},
+  {k:'poise', ko:'품위', c:'var(--g4)'},
+  {k:'wit',   ko:'지혜', c:'var(--g5)'},
+  {k:'charm', ko:'매력', c:'var(--g6)'},
+];
+
+const qs = new URLSearchParams(location.search);
+const app = document.getElementById('app');
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
+
+async function api(action, params={}, post=false){
+  const all = Object.assign({action}, params);
+  if(!post){
+    const u = new URL(API_URL);
+    Object.keys(all).forEach(k=>u.searchParams.set(k, all[k]));
+    const r = await fetch(u); return r.json();
+  } else {
+    const r = await fetch(API_URL, {method:'POST', body:JSON.stringify(all)});
+    return r.json();
+  }
+}
+
+function crest(){ return `<div class="crest"><div class="t">여섯 보석의 궁정</div><div class="s">THE COURT OF SIX JEWELS</div></div>`; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------------- 라우팅 ---------------- */
+async function boot(){
+  if(API_URL.indexOf('PASTE_')===0){
+    app.innerHTML = crest()+`<div class="card"><h2 class="sec">설정 필요</h2><p class="hint">court.html 안 <b>API_URL</b> 에 배포한 Apps Script /exec 주소를 넣어주세요.</p></div>`;
+    return;
+  }
+  try{
+    if(qs.get('admin')) return renderAdmin(qs.get('admin'));
+    if(qs.get('id') && qs.get('key')) return renderPlayer(qs.get('id'), qs.get('key'));
+    app.innerHTML = crest()+`<div class="card"><p class="muted center">올바른 초대 링크로 들어와 주세요.</p></div>`;
+  }catch(e){
+    app.innerHTML = crest()+`<div class="card"><p class="muted center">문제가 발생했어요: ${esc(e)}</p></div>`;
+  }
+}
+
+/* ---------------- 영애 화면 ---------------- */
+async function renderPlayer(id, key){
+  const d = await api('me', {id, key});
+  if(!d.ok){ app.innerHTML = crest()+`<div class="card"><p class="center muted">링크가 올바르지 않아요.</p></div>`; return; }
+
+  let html = crest();
+  html += `<div class="card"><div class="row" style="justify-content:space-between">
+     <div><div style="font-family:'Song Myung';font-size:22px;color:var(--gold-bright)">${esc(d.princess||d.name)}</div>
+     <div class="muted" style="font-size:12px;margin-top:4px">${esc(d.name||'')}</div></div>
+     <span class="badge">${esc(d.pot||'')} 팟</span></div></div>`;
+
+  // 우승 발표
+  if(d.winner_revealed){
+    html += `<div class="card center">${d.am_i_winner
+      ? `<div style="font-family:'Song Myung';font-size:24px;color:var(--gold-bright)">👑 대관을 축하드립니다</div><p class="muted" style="margin-top:8px">오늘의 공주는 영애님이십니다.</p>`
+      : `<p class="muted">대관식이 끝났어요. 오늘의 공주가 정해졌습니다.</p>`}</div>`;
+  }
+
+  // 점수 (공개 시)
+  if(d.reveal && d.gems){
+    html += `<div class="card"><h2 class="sec">나의 육각형</h2><div class="hexwrap">${hexSVG(d.gems)}</div>`;
+    GEMS.forEach(g=>{ html += `<div class="gemrow"><span>${g.ko}</span><b>${d.gems[g.k]} / 10</b></div>`; });
+    html += `<div class="gemrow" style="border:none;margin-top:8px"><span>합계</span><b>${d.total}</b></div>
+             <div class="gemrow" style="border:none"><span>균형 점수</span><b style="color:var(--gold-bright)">${d.balance}</b></div>
+             <p class="hint" style="margin-top:8px">균형 점수 = 합계 − (최고−최저). 고르게 빛날수록 높아요.</p></div>`;
+  } else {
+    html += `<div class="card center"><p class="muted">점수는 대관식에서 공개됩니다. ✨</p></div>`;
+  }
+
+  // 비밀 미션 (집사의 영애만)
+  if(d.is_owner){
+    html += `<div class="card"><div class="mission"><div class="h">🤫 집사의 영애 — 비밀 임무</div>
+      <p style="line-height:1.8">${esc(d.mission||'(임무가 곧 전달됩니다)')}</p>
+      <p class="hint" style="margin-top:10px">상태: <b>${esc(d.mission_status||'진행 중')}</b><br>아무에게도 들키지 마세요. 끝까지 정체를 숨기시길.</p></div></div>`;
+  }
+
+  // 투표
+  if(d.voting_open){
+    html += `<div class="card"><h2 class="sec">집사의 영애는 누구일까요?</h2>
+      <p class="hint">하루를 돌아보고, 집사가 남몰래 모신 단 한 분을 지목해 주세요.</p>
+      <div class="vote-grid" id="voteGrid">${
+        d.others.map(o=>`<button data-id="${esc(o.id)}" class="voteBtn ${d.voted&&d.my_guess===o.id?'on':''}">${esc(o.princess)}</button>`).join('')
+      }</div>
+      <p class="hint" id="voteMsg" style="margin-top:10px">${d.voted?'투표가 접수되었어요. 바꾸려면 다시 눌러주세요.':''}</p></div>`;
+  }
+
+  app.innerHTML = html;
+
+  if(d.voting_open){
+    document.querySelectorAll('.voteBtn').forEach(b=>{
+      b.onclick = async ()=>{
+        const g = b.getAttribute('data-id');
+        const r = await api('vote', {id, key, guess:g}, true);
+        if(r.ok){
+          document.querySelectorAll('.voteBtn').forEach(x=>x.classList.remove('on'));
+          b.classList.add('on');
+          document.getElementById('voteMsg').textContent = '투표가 접수되었어요. 바꾸려면 다시 눌러주세요.';
+          toast('지목 완료 🤍');
+        } else { toast(r.error==='voting_closed'?'투표가 마감되었어요':'오류가 발생했어요'); }
+      };
+    });
+  }
+}
+
+/* 육각형 레이더 SVG */
+function hexSVG(gems){
+  const cx=110, cy=110, R=88;
+  const ang = i => (-90 + i*60) * Math.PI/180;
+  const pt = (i,r)=>[cx + r*Math.cos(ang(i)), cy + r*Math.sin(ang(i))];
+  let grid='';
+  [0.25,0.5,0.75,1].forEach(f=>{
+    const p = GEMS.map((_,i)=>pt(i,R*f).map(n=>n.toFixed(1)).join(',')).join(' ');
+    grid += `<polygon points="${p}" fill="none" stroke="rgba(216,185,120,.18)"/>`;
+  });
+  let axes='', labels='';
+  GEMS.forEach((g,i)=>{
+    const e=pt(i,R), l=pt(i,R+16);
+    axes += `<line x1="${cx}" y1="${cy}" x2="${e[0].toFixed(1)}" y2="${e[1].toFixed(1)}" stroke="rgba(216,185,120,.18)"/>`;
+    labels += `<text x="${l[0].toFixed(1)}" y="${l[1].toFixed(1)}" fill="var(--parch-dim)" font-size="11" text-anchor="middle" dominant-baseline="middle" font-family="Song Myung">${g.ko}</text>`;
+  });
+  const vpts = GEMS.map((g,i)=>pt(i, R*(Number(gems[g.k])||0)/10).map(n=>n.toFixed(1)).join(',')).join(' ');
+  return `<svg viewBox="0 0 220 220" width="240" height="240">${grid}${axes}
+    <polygon points="${vpts}" fill="rgba(216,185,120,.28)" stroke="var(--gold-bright)" stroke-width="2"/>
+    ${labels}</svg>`;
+}
+
+/* ---------------- 집사(admin) 화면 ---------------- */
+async function renderAdmin(key){
+  const d = await api('all', {key});
+  if(!d.ok){ app.innerHTML = crest()+`<div class="card"><p class="center muted">admin key 가 올바르지 않아요.</p></div>`; return; }
+
+  const ranked = [...d.players].sort((a,b)=> b.balance - a.balance);
+  const reveal = truthy(d.config.reveal_scores), voting = truthy(d.config.voting_open);
+  const winnerId = d.config.winner_id;
+  const base = location.origin + location.pathname;
+
+  let html = crest();
+
+  // 컨트롤
+  html += `<div class="card"><h2 class="sec">집사 콘솔</h2>
+    <div class="row" style="gap:18px">
+      <label class="toggle"><input type="checkbox" id="tReveal" ${reveal?'checked':''}> 점수 공개</label>
+      <label class="toggle"><input type="checkbox" id="tVote" ${voting?'checked':''}> 투표 열기</label>
+    </div>
+    <p class="hint" style="margin-top:10px">점수 공개를 켜면 영애들이 자기 육각형을 볼 수 있어요. 대관식 전까지는 꺼두는 걸 권해요.</p></div>`;
+
+  // 순위
+  html += `<div class="card"><h2 class="sec">순위 (균형 점수)</h2><div class="scroll"><table>
+    <tr><th>#</th><th>영애</th><th>팟</th>${GEMS.map(g=>`<th>${g.ko}</th>`).join('')}<th>합계</th><th>균형</th><th>우승</th></tr>`;
+  ranked.forEach((p,idx)=>{
+    html += `<tr>
+      <td class="${idx===0?'rank1':''}">${idx+1}</td>
+      <td class="name ${idx===0?'rank1':''}">${esc(p.princess||p.name)} ${p.is_owner?'🤫':''} ${p.is_leader?'👁':''}<div class="muted" style="font-size:11px">${esc(p.name||'')}</div></td>
+      <td>${esc(p.pot||'')}</td>
+      ${GEMS.map(g=>`<td><input type="number" min="0" max="10" value="${p.gems[g.k]}" data-id="${esc(p.id)}" data-gem="${g.k}" class="scoreIn"></td>`).join('')}
+      <td>${p.total}</td><td class="${idx===0?'rank1':''}">${p.balance}</td>
+      <td><button class="sm winBtn ${String(winnerId)===String(p.id)?'gold':''}" data-id="${esc(p.id)}">${String(winnerId)===String(p.id)?'👑':'선택'}</button></td>
+    </tr>`;
+  });
+  html += `</table></div><p class="hint" style="margin-top:8px">숫자를 바꾸면 자동 저장돼요. 🤫=집사의 영애, 👁=팟장.</p></div>`;
+
+  // 역할/미션
+  html += `<div class="card"><h2 class="sec">역할 · 비밀 미션</h2><div class="scroll"><table>
+    <tr><th>영애</th><th>집사의 영애</th><th>팟장</th><th>미션 내용</th><th>상태</th></tr>`;
+  d.players.forEach(p=>{
+    html += `<tr>
+      <td class="name">${esc(p.princess||p.name)}</td>
+      <td><input type="checkbox" class="ownerChk" data-id="${esc(p.id)}" ${p.is_owner?'checked':''}></td>
+      <td><input type="checkbox" class="leadChk" data-id="${esc(p.id)}" ${p.is_leader?'checked':''}></td>
+      <td><input type="text" class="missIn" data-id="${esc(p.id)}" value="${esc(p.mission)}" placeholder="비밀 미션…" style="width:200px"></td>
+      <td><select class="statSel" data-id="${esc(p.id)}">
+        ${['진행 중','완수','오후 발각','오전 발각'].map(s=>`<option ${p.mission_status===s?'selected':''}>${s}</option>`).join('')}
+      </select></td></tr>`;
+  });
+  html += `</table></div><p class="hint" style="margin-top:8px">집사의 영애는 한 명만 지정돼요(다른 체크는 자동 해제). 미션 칸은 Enter로 저장.</p></div>`;
+
+  // 투표 집계
+  html += `<div class="card"><h2 class="sec">투표 집계 — "집사의 영애 지목"</h2>`;
+  if(d.votes.length===0){ html += `<p class="muted">아직 투표가 없어요.</p>`; }
+  else {
+    const correct = d.votes.filter(v=>v.correct).length;
+    html += `<p class="hint">정답자 ${correct} / ${d.votes.length}명</p><div class="scroll"><table>
+      <tr><th>영애</th><th>지목</th><th>정답?</th></tr>
+      ${d.votes.map(v=>`<tr><td class="name">${esc(v.voter)}</td><td>${esc(v.guess)}</td>
+        <td>${v.correct===null?'-':(v.correct?'✅':'❌')}</td></tr>`).join('')}</table></div>`;
+  }
+  html += `</div>`;
+
+  // 링크 생성기
+  html += `<div class="card"><h2 class="sec">영애별 링크</h2><p class="hint">각 영애에게 아래 링크를 개별 전달하세요. 본인 것만 보입니다.</p><div class="scroll"><table>
+    <tr><th>영애</th><th>링크</th><th></th></tr>
+    ${d.players.map(p=>{
+      const link = `${base}?id=${encodeURIComponent(p.id)}&key=${encodeURIComponent(p.key)}`;
+      return `<tr><td class="name">${esc(p.princess||p.name)}</td><td class="link">${esc(link)}</td>
+        <td><button class="sm copyBtn" data-link="${esc(link)}">복사</button></td></tr>`;
+    }).join('')}
+  </table></div></div>`;
+
+  app.innerHTML = html;
+  bindAdmin(key);
+}
+
+function bindAdmin(key){
+  const save = async (params)=>{ const r = await api(params.action, Object.assign({key},params), true); toast(r.ok?'저장됐어요':'오류: '+(r.error||'')); return r; };
+
+  document.getElementById('tReveal').onchange = e => save({action:'setToggle', name:'reveal_scores', value: e.target.checked});
+  document.getElementById('tVote').onchange   = e => save({action:'setToggle', name:'voting_open',   value: e.target.checked});
+
+  document.querySelectorAll('.scoreIn').forEach(inp=>{
+    inp.onchange = ()=> save({action:'setScore', id:inp.dataset.id, gem:inp.dataset.gem, value:inp.value});
+  });
+  document.querySelectorAll('.ownerChk').forEach(c=>{
+    c.onchange = async ()=>{ await save({action:'setField', id:c.dataset.id, field:'is_owner', value:c.checked}); if(c.checked) setTimeout(()=>renderAdmin(key),400); };
+  });
+  document.querySelectorAll('.leadChk').forEach(c=>{
+    c.onchange = ()=> save({action:'setField', id:c.dataset.id, field:'is_leader', value:c.checked});
+  });
+  document.querySelectorAll('.missIn').forEach(inp=>{
+    inp.onkeydown = e=>{ if(e.key==='Enter') save({action:'setField', id:inp.dataset.id, field:'mission', value:inp.value}); };
+  });
+  document.querySelectorAll('.statSel').forEach(sel=>{
+    sel.onchange = ()=> save({action:'setField', id:sel.dataset.id, field:'mission_status', value:sel.value});
+  });
+  document.querySelectorAll('.winBtn').forEach(b=>{
+    b.onclick = async ()=>{ await save({action:'setWinner', id:b.dataset.id}); setTimeout(()=>renderAdmin(key),400); };
+  });
+  document.querySelectorAll('.copyBtn').forEach(b=>{
+    b.onclick = ()=>{ navigator.clipboard.writeText(b.dataset.link); toast('링크 복사됨'); };
+  });
+}
+
+function truthy(v){ return v===true || String(v).toUpperCase()==='TRUE' || v===1 || v==='1'; }
+
+boot();
+</script>
+</body>
+</html>
