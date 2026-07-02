@@ -110,25 +110,73 @@ async function api(action, params={}, post=false){
 function crest(){ return `<div class="crest"><div class="t">여섯 보석의 궁정</div><div class="s">THE COURT OF SIX JEWELS</div></div>`; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+/* ---------------- 세션 ---------------- */
+function saveSession(s){ try{ localStorage.setItem('court_session', JSON.stringify(s)); }catch(e){} }
+function loadSession(){ try{ return JSON.parse(localStorage.getItem('court_session')); }catch(e){ return null; } }
+function clearSession(){ try{ localStorage.removeItem('court_session'); }catch(e){} }
+function logout(){ clearSession(); renderLogin(); }
+function logoutBar(){ return `<div class="center" style="margin-top:6px"><button class="sm" id="logoutBtn">로그아웃</button></div>`; }
+function bindLogout(){ const b=document.getElementById('logoutBtn'); if(b) b.onclick=logout; }
+
 /* ---------------- 라우팅 ---------------- */
 async function boot(){
   if(API_URL.indexOf('PASTE_')===0){
     app.innerHTML = crest()+`<div class="card"><h2 class="sec">설정 필요</h2><p class="hint">court.html 안 <b>API_URL</b> 에 배포한 Apps Script /exec 주소를 넣어주세요.</p></div>`;
     return;
   }
-  try{
-    if(qs.get('admin')) return renderAdmin(qs.get('admin'));
-    if(qs.get('id') && qs.get('key')) return renderPlayer(qs.get('id'), qs.get('key'));
-    app.innerHTML = crest()+`<div class="card"><p class="muted center">올바른 초대 링크로 들어와 주세요.</p></div>`;
-  }catch(e){
-    app.innerHTML = crest()+`<div class="card"><p class="muted center">문제가 발생했어요: ${esc(e)}</p></div>`;
-  }
+  const s = loadSession();
+  if(s && s.role==='admin')  return renderAdmin(s.key);
+  if(s && s.role==='player') return renderPlayer(s.id, s.key);
+  renderLogin();
+}
+
+/* ---------------- 로그인 화면 ---------------- */
+async function renderLogin(){
+  let roster = [];
+  try{ const r = await api('roster', {}); if(r.ok) roster = r.players; }catch(e){}
+  const opts = roster.map(p=>`<option value="${esc(p.id)}">${esc(p.princess||p.name)}</option>`).join('');
+  app.innerHTML = crest()+`
+   <div class="card" style="max-width:380px;margin:0 auto">
+     <h2 class="sec">입궁</h2>
+     <p class="hint" style="margin-bottom:14px">이름을 고르고 비밀번호를 입력하세요.</p>
+     <div style="display:flex;flex-direction:column;gap:12px">
+       <select id="who" style="width:100%">
+         <option value="">— 영애를 선택 —</option>
+         ${opts}
+         <option value="__admin__">집사 (운영자)</option>
+       </select>
+       <input type="password" id="pw" placeholder="비밀번호" style="width:100%">
+       <button class="gold" id="loginBtn">입궁하기</button>
+       <p class="hint" id="loginMsg" style="color:var(--bad);min-height:16px"></p>
+     </div>
+   </div>`;
+  const doLogin = async ()=>{
+    const who = document.getElementById('who').value;
+    const pw  = document.getElementById('pw').value.trim();
+    const msg = document.getElementById('loginMsg');
+    if(!who){ msg.textContent='이름을 선택해 주세요.'; return; }
+    if(!pw){ msg.textContent='비밀번호를 입력해 주세요.'; return; }
+    msg.textContent='확인 중…';
+    try{
+      if(who==='__admin__'){
+        const d = await api('all', {key:pw});
+        if(d.ok){ saveSession({role:'admin', key:pw}); renderAdmin(pw); }
+        else msg.textContent='비밀번호가 올바르지 않아요.';
+      } else {
+        const d = await api('me', {id:who, key:pw});
+        if(d.ok){ saveSession({role:'player', id:who, key:pw}); renderPlayer(who, pw); }
+        else msg.textContent='비밀번호가 올바르지 않아요.';
+      }
+    }catch(e){ msg.textContent='연결에 문제가 있어요. 잠시 후 다시 시도해 주세요.'; }
+  };
+  document.getElementById('loginBtn').onclick = doLogin;
+  document.getElementById('pw').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 }
 
 /* ---------------- 영애 화면 ---------------- */
 async function renderPlayer(id, key){
   const d = await api('me', {id, key});
-  if(!d.ok){ app.innerHTML = crest()+`<div class="card"><p class="center muted">링크가 올바르지 않아요.</p></div>`; return; }
+  if(!d.ok){ clearSession(); return renderLogin(); }
 
   let html = crest();
   html += `<div class="card"><div class="row" style="justify-content:space-between">
@@ -171,7 +219,8 @@ async function renderPlayer(id, key){
       <p class="hint" id="voteMsg" style="margin-top:10px">${d.voted?'투표가 접수되었어요. 바꾸려면 다시 눌러주세요.':''}</p></div>`;
   }
 
-  app.innerHTML = html;
+  app.innerHTML = html + logoutBar();
+  bindLogout();
 
   if(d.voting_open){
     document.querySelectorAll('.voteBtn').forEach(b=>{
@@ -214,7 +263,7 @@ function hexSVG(gems){
 /* ---------------- 집사(admin) 화면 ---------------- */
 async function renderAdmin(key){
   const d = await api('all', {key});
-  if(!d.ok){ app.innerHTML = crest()+`<div class="card"><p class="center muted">admin key 가 올바르지 않아요.</p></div>`; return; }
+  if(!d.ok){ clearSession(); return renderLogin(); }
 
   const ranked = [...d.players].sort((a,b)=> b.balance - a.balance);
   const reveal = truthy(d.config.reveal_scores), voting = truthy(d.config.voting_open);
@@ -273,18 +322,18 @@ async function renderAdmin(key){
   }
   html += `</div>`;
 
-  // 링크 생성기
-  html += `<div class="card"><h2 class="sec">영애별 링크</h2><p class="hint">각 영애에게 아래 링크를 개별 전달하세요. 본인 것만 보입니다.</p><div class="scroll"><table>
-    <tr><th>영애</th><th>링크</th><th></th></tr>
+  // 비밀번호 배포
+  html += `<div class="card"><h2 class="sec">영애별 비밀번호</h2><p class="hint">각 영애에게 <b>이름과 비밀번호</b>를 알려주세요. 사이트에서 이름을 고르고 이 비밀번호로 입궁합니다. (집사는 로그인 시 "집사"를 골라 admin key 입력)</p><div class="scroll"><table>
+    <tr><th>영애</th><th>비밀번호</th><th></th></tr>
     ${d.players.map(p=>{
-      const link = `${base}?id=${encodeURIComponent(p.id)}&key=${encodeURIComponent(p.key)}`;
-      return `<tr><td class="name">${esc(p.princess||p.name)}</td><td class="link">${esc(link)}</td>
-        <td><button class="sm copyBtn" data-link="${esc(link)}">복사</button></td></tr>`;
+      return `<tr><td class="name">${esc(p.princess||p.name)}</td><td class="link">${esc(p.key)}</td>
+        <td><button class="sm copyBtn" data-copy="${esc(p.key)}">복사</button></td></tr>`;
     }).join('')}
   </table></div></div>`;
 
-  app.innerHTML = html;
+  app.innerHTML = html + logoutBar();
   bindAdmin(key);
+  bindLogout();
 }
 
 function bindAdmin(key){
@@ -312,7 +361,7 @@ function bindAdmin(key){
     b.onclick = async ()=>{ await save({action:'setWinner', id:b.dataset.id}); setTimeout(()=>renderAdmin(key),400); };
   });
   document.querySelectorAll('.copyBtn').forEach(b=>{
-    b.onclick = ()=>{ navigator.clipboard.writeText(b.dataset.link); toast('링크 복사됨'); };
+    b.onclick = ()=>{ navigator.clipboard.writeText(b.dataset.copy); toast('비밀번호 복사됨'); };
   });
 }
 
