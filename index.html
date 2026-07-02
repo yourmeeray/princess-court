@@ -69,6 +69,27 @@
   .center{text-align:center}
   .toggle{display:flex;gap:8px;align-items:center}
   .hint{font-size:12px;color:var(--parch-dim);line-height:1.7}
+  /* 초대장 */
+  .inv{display:flex;gap:14px;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;
+    background:linear-gradient(180deg,rgba(216,185,120,.05),rgba(216,185,120,.01))}
+  .inv-img{width:96px;height:96px;border-radius:10px;flex:0 0 auto;object-fit:cover;border:1px solid var(--line)}
+  .inv-img.ph{background:
+    radial-gradient(60px 60px at 50% 35%, rgba(241,217,156,.28), rgba(241,217,156,0) 70%),
+    linear-gradient(160deg,var(--velvet-2),var(--velvet));
+    display:flex;align-items:center;justify-content:center}
+  .inv-img.ph::after{content:'👑';font-size:30px;opacity:.5}
+  .inv-body{flex:1;min-width:0}
+  .inv-badges{margin-bottom:6px}
+  .gembadge{display:inline-block;font-size:11px;color:var(--gold);border:1px solid var(--line);
+    border-radius:12px;padding:2px 8px;margin-right:4px}
+  .inv-title{font-family:'Song Myung',serif;color:var(--gold-bright);font-size:16px;letter-spacing:.04em}
+  .inv-meta{font-size:12px;color:var(--parch-dim);margin-top:4px}
+  .inv-desc{font-size:13px;line-height:1.7;margin-top:8px}
+  .inv-mission{margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;
+    background:rgba(216,185,120,.05);font-size:13px;line-height:1.7}
+  .inv.locked{align-items:center;justify-content:center;color:var(--parch-dim);
+    border-style:dashed;padding:22px;gap:10px}
+  .inv .seal{font-size:22px}
 </style>
 </head>
 <body>
@@ -83,13 +104,19 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbwdFOvcE6q_qjN79v1cGFZf4cPXQJshXpCqoGUgCkLnYhxpBoKEHx06CDM9LU7EjYCX/exec";
 
 const GEMS = [
-  {k:'grace', ko:'우아', c:'var(--g1)'},
-  {k:'craft', ko:'솜씨', c:'var(--g2)'},
-  {k:'taste', ko:'미각', c:'var(--g3)'},
-  {k:'poise', ko:'품위', c:'var(--g4)'},
-  {k:'wit',   ko:'지혜', c:'var(--g5)'},
-  {k:'charm', ko:'매력', c:'var(--g6)'},
+  {k:'grace', ko:'우아', c:'var(--g1)', em:'🩰'},
+  {k:'craft', ko:'솜씨', c:'var(--g2)', em:'🧺'},
+  {k:'taste', ko:'미각', c:'var(--g3)', em:'🍪'},
+  {k:'poise', ko:'품위', c:'var(--g4)', em:'🍽'},
+  {k:'wit',   ko:'지혜', c:'var(--g5)', em:'💎'},
+  {k:'charm', ko:'매력', c:'var(--g6)', em:'💞'},
 ];
+const VOTE_GEMS = ['grace','craft','taste','poise'];   // 항목투표 채점 (지혜·매력은 퀴즈 합산)
+function gemBadges(gemStr){
+  return String(gemStr||'').split(',').map(s=>s.trim()).filter(Boolean).map(k=>{
+    const g = GEMS.find(x=>x.k===k); return g?`<span class="gembadge">${g.em} ${g.ko}</span>`:'';
+  }).join(' ');
+}
 
 const qs = new URLSearchParams(location.search);
 const app = document.getElementById('app');
@@ -185,6 +212,27 @@ async function renderPlayer(id, key){
      <div class="muted" style="font-size:12px;margin-top:4px">${esc(d.name||'')}</div></div>
      <span class="badge">${esc(d.pot||'')} 팟</span></div></div>`;
 
+  // 초대장
+  if(d.invitations && d.invitations.length){
+    html += `<div class="card"><h2 class="sec">초대장</h2>`;
+    d.invitations.forEach(inv=>{
+      if(inv.locked){
+        html += `<div class="inv locked"><span class="seal">🔒</span> 아직 봉인된 초대장이 있습니다</div>`;
+        return;
+      }
+      const img = inv.image ? `<img src="${esc(inv.image)}" class="inv-img" alt="">` : `<div class="inv-img ph"></div>`;
+      const meta = [esc(inv.time||''), esc(inv.place||'')].filter(Boolean).join(' · ');
+      html += `<div class="inv">${img}<div class="inv-body">
+        <div class="inv-badges">${gemBadges(inv.gem)}</div>
+        <div class="inv-title">${esc(inv.title||'')}</div>
+        <div class="inv-meta">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
+        ${inv.description?`<p class="inv-desc">${esc(inv.description)}</p>`:''}
+        ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:`<div class="inv-mission muted">이 자리의 미션은 곧 전해집니다.</div>`}
+      </div></div>`;
+    });
+    html += `</div>`;
+  }
+
   // 우승 발표
   if(d.winner_revealed){
     html += `<div class="card center">${d.am_i_winner
@@ -225,7 +273,7 @@ async function renderPlayer(id, key){
     const cand = d.others || [];
     html += `<div class="card"><h2 class="sec">항목별 투표</h2>
       <p class="hint">항목마다 제일 잘한 분을 1·2·3위로 뽑아주세요. <b>1위 5점 · 2위 3점 · 3위 1점</b> (본인 제외). 고르면 자동 저장돼요.</p>`;
-    GEMS.forEach(g=>{
+    GEMS.filter(g=>VOTE_GEMS.includes(g.k)).forEach(g=>{
       const mv = (d.my_gem_votes && d.my_gem_votes[g.k]) || ['','',''];
       const sel = (rank,val)=>`<select class="gemSel" data-cat="${g.k}" data-rank="${rank}">
           <option value="">—</option>
@@ -328,22 +376,54 @@ async function renderAdmin(key){
       <td class="${idx===0?'rank1':''}">${idx+1}</td>
       <td class="name ${idx===0?'rank1':''}">${esc(p.princess||p.name)} ${p.is_owner?'🤫':''} ${p.is_leader?'👁':''}<div class="muted" style="font-size:11px">${esc(p.name||'')}</div></td>
       <td>${esc(p.pot||'')}</td>
-      ${GEMS.map(g=>`<td><input type="number" min="0" value="${p.gems[g.k]}" data-id="${esc(p.id)}" data-gem="${g.k}" class="scoreIn${p.overridden&&p.overridden[g.k]?' ov':''}" title="${p.overridden&&p.overridden[g.k]?'수동 고정 — 지우면 투표 집계값으로 복귀':'투표 집계값 — 숫자를 넣으면 수동 고정'}"></td>`).join('')}
+      ${GEMS.map(g=> VOTE_GEMS.includes(g.k)
+        ? `<td><input type="number" min="0" value="${p.gems[g.k]}" data-id="${esc(p.id)}" data-gem="${g.k}" class="scoreIn${p.overridden&&p.overridden[g.k]?' ov':''}" title="${p.overridden&&p.overridden[g.k]?'수동 고정 — 지우면 투표 집계값으로 복귀':'투표 집계값 — 숫자를 넣으면 수동 고정'}"></td>`
+        : `<td class="muted" title="퀴즈 합산 (아래 퀴즈 점수에서 관리)">${p.gems[g.k]}</td>`).join('')}
       <td>${p.total}</td><td class="${idx===0?'rank1':''}">${p.balance}</td>
       <td><button class="sm winBtn ${String(winnerId)===String(p.id)?'gold':''}" data-id="${esc(p.id)}">${String(winnerId)===String(p.id)?'👑':'선택'}</button></td>
     </tr>`;
   });
-  html += `</table></div><p class="hint" style="margin-top:8px">점수는 항목별 투표로 자동 집계돼요. 칸에 <b>숫자를 넣으면 수동 고정(금색)</b>, <b>지우면 투표값으로 복귀</b>. 🤫=집사의 영애, 👁=팟장.</p></div>`;
+  html += `</table></div><p class="hint" style="margin-top:8px">우아·솜씨·미각·품위는 항목투표 자동 집계(숫자 입력=수동 고정 금색, 지우면 복귀). <b>지혜·매력은 아래 "퀴즈 점수" 합산</b>이라 여기선 읽기 전용. 🤫=집사의 영애, 👁=팟장.</p></div>`;
 
-  // 항목별 투표 집계
+  // 항목별 투표 집계 (우아·솜씨·미각·품위)
   html += `<div class="card"><h2 class="sec">항목별 투표 집계</h2><div class="scroll"><table>
     <tr><th>항목</th><th>순위 (득점)</th></tr>
-    ${GEMS.map(g=>{
+    ${GEMS.filter(g=>VOTE_GEMS.includes(g.k)).map(g=>{
       const list = (d.gem_tally && d.gem_tally[g.k]) || [];
       const txt = list.length ? list.map((x,i)=>`${i+1}. ${esc(x.name)} (${x.points})`).join(' · ') : '<span class="muted">아직 투표 없음</span>';
-      return `<tr><td>${g.ko}</td><td class="name">${txt}</td></tr>`;
+      return `<tr><td>${g.em} ${g.ko}</td><td class="name">${txt}</td></tr>`;
     }).join('')}
-  </table></div><p class="hint" style="margin-top:8px">1위 5점 · 2위 3점 · 3위 1점. 위 순위표 점수는 이 집계(또는 수동 고정값)로 계산돼요.</p></div>`;
+  </table></div><p class="hint" style="margin-top:8px">1위 5점 · 2위 3점 · 3위 1점.</p></div>`;
+
+  // 초대장 공개
+  html += `<div class="card"><h2 class="sec">초대장 공개</h2>`;
+  if(!d.invitations || !d.invitations.length){ html += `<p class="muted">Invitations 탭이 아직 없어요.</p>`; }
+  else {
+    html += `<div class="row" style="flex-direction:column;align-items:stretch;gap:10px">`;
+    d.invitations.forEach(inv=>{
+      html += `<label class="toggle" style="justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+        <span>${gemBadges(inv.gem)} <b>${esc(inv.title||inv.inv_id)}</b></span>
+        ${inv.always_open
+          ? `<span class="pill">항상 공개</span>`
+          : `<input type="checkbox" class="invChk" data-inv="${esc(inv.inv_id)}" ${inv.is_open?'checked':''}>`}
+      </label>`;
+    });
+    html += `</div><p class="hint" style="margin-top:8px">켜면 영애 화면에 해당 초대장이 나타나요. (전체 이벤트=항상 공개)</p>`;
+  }
+  html += `</div>`;
+
+  // 퀴즈 점수 (지혜·매력)
+  html += `<div class="card"><h2 class="sec">퀴즈 점수 (지혜·매력)</h2>`;
+  if(!d.quizzes || !d.quizzes.length){ html += `<p class="muted">Quizzes 탭이 아직 없어요.</p>`; }
+  else {
+    html += `<div class="scroll"><table><tr><th>영애</th>${d.quizzes.map(q=>`<th title="${esc(q.gem)} / 최대 ${esc(q.max)}">${esc(q.label||q.quiz_id)}</th>`).join('')}</tr>`;
+    d.players.forEach(p=>{
+      const sc = (d.quiz_scores && d.quiz_scores[p.id]) || {};
+      html += `<tr><td class="name">${esc(p.princess||p.name)}</td>${d.quizzes.map(q=>`<td><input type="number" min="0" ${q.max!==''&&q.max!=null?`max="${esc(q.max)}"`:''} value="${sc[q.quiz_id]!=null?esc(sc[q.quiz_id]):''}" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" class="quizIn"></td>`).join('')}</tr>`;
+    });
+    html += `</table></div><p class="hint" style="margin-top:8px">gem이 wit인 퀴즈 합=지혜, charm 합=매력. 숫자를 바꾸면 자동 저장돼요.</p>`;
+  }
+  html += `</div>`;
 
   // 역할/미션
   html += `<div class="card"><h2 class="sec">역할 · 비밀 미션</h2><div class="scroll"><table>
@@ -413,6 +493,12 @@ function bindAdmin(key){
   });
   document.querySelectorAll('.copyBtn').forEach(b=>{
     b.onclick = ()=>{ navigator.clipboard.writeText(b.dataset.copy); toast('비밀번호 복사됨'); };
+  });
+  document.querySelectorAll('.invChk').forEach(c=>{
+    c.onchange = ()=> save({action:'setInvOpen', inv_id:c.dataset.inv, value:c.checked});
+  });
+  document.querySelectorAll('.quizIn').forEach(inp=>{
+    inp.onchange = ()=> save({action:'setQuizScore', player_id:inp.dataset.pid, quiz_id:inp.dataset.qid, value:inp.value});
   });
 }
 
