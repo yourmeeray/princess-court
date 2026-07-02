@@ -42,6 +42,7 @@
   input,select{font-family:"Nanum Myeongjo",serif;background:rgba(0,0,0,.25);
     color:var(--parch);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:14px}
   input[type=number]{width:52px;text-align:center}
+  input.scoreIn.ov{border-color:var(--gold);color:var(--gold-bright);font-weight:700}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
     background:var(--velvet-2);border:1px solid var(--gold);color:var(--parch);
@@ -193,11 +194,11 @@ async function renderPlayer(id, key){
 
   // 점수 (공개 시)
   if(d.reveal && d.gems){
-    html += `<div class="card"><h2 class="sec">나의 육각형</h2><div class="hexwrap">${hexSVG(d.gems)}</div>`;
-    GEMS.forEach(g=>{ html += `<div class="gemrow"><span>${g.ko}</span><b>${d.gems[g.k]} / 10</b></div>`; });
+    html += `<div class="card"><h2 class="sec">나의 육각형</h2><div class="hexwrap">${hexSVG(d.gems, d.scale)}</div>`;
+    GEMS.forEach(g=>{ html += `<div class="gemrow"><span>${g.ko}</span><b>${d.gems[g.k]}점</b></div>`; });
     html += `<div class="gemrow" style="border:none;margin-top:8px"><span>합계</span><b>${d.total}</b></div>
              <div class="gemrow" style="border:none"><span>균형 점수</span><b style="color:var(--gold-bright)">${d.balance}</b></div>
-             <p class="hint" style="margin-top:8px">균형 점수 = 합계 − (최고−최저). 고르게 빛날수록 높아요.</p></div>`;
+             <p class="hint" style="margin-top:8px">점수는 항목별 투표로 산정돼요. 균형 점수 = 합계 − (최고−최저). 고르게 빛날수록 높아요.</p></div>`;
   } else {
     html += `<div class="card center"><p class="muted">점수는 대관식에서 공개됩니다. ✨</p></div>`;
   }
@@ -219,6 +220,27 @@ async function renderPlayer(id, key){
       <p class="hint" id="voteMsg" style="margin-top:10px">${d.voted?'투표가 접수되었어요. 바꾸려면 다시 눌러주세요.':''}</p></div>`;
   }
 
+  // 항목별 투표 (각 보석마다 1·2·3위 지명)
+  if(d.gem_voting_open){
+    const cand = d.others || [];
+    html += `<div class="card"><h2 class="sec">항목별 투표</h2>
+      <p class="hint">항목마다 제일 잘한 분을 1·2·3위로 뽑아주세요. <b>1위 5점 · 2위 3점 · 3위 1점</b> (본인 제외). 고르면 자동 저장돼요.</p>`;
+    GEMS.forEach(g=>{
+      const mv = (d.my_gem_votes && d.my_gem_votes[g.k]) || ['','',''];
+      const sel = (rank,val)=>`<select class="gemSel" data-cat="${g.k}" data-rank="${rank}">
+          <option value="">—</option>
+          ${cand.map(o=>`<option value="${esc(o.id)}" ${String(val)===String(o.id)?'selected':''}>${esc(o.princess)}</option>`).join('')}
+        </select>`;
+      html += `<div style="margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px">
+         <div style="color:var(--gold);margin-bottom:8px">${g.ko}</div>
+         <div class="row"><span class="muted" style="font-size:12px">1위</span>${sel(1,mv[0])}
+            <span class="muted" style="font-size:12px">2위</span>${sel(2,mv[1])}
+            <span class="muted" style="font-size:12px">3위</span>${sel(3,mv[2])}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
   app.innerHTML = html + logoutBar();
   bindLogout();
 
@@ -236,10 +258,27 @@ async function renderPlayer(id, key){
       };
     });
   }
+
+  if(d.gem_voting_open){
+    const saveCat = async (cat)=>{
+      const val = r => (document.querySelector(`.gemSel[data-cat="${cat}"][data-rank="${r}"]`)||{}).value || '';
+      const r = await api('gemVote', {id, key, category:cat, rank1:val(1), rank2:val(2), rank3:val(3)}, true);
+      toast(r.ok ? '투표 저장됨 🤍' : (r.error==='gem_voting_closed'?'투표가 마감되었어요':'오류가 발생했어요'));
+    };
+    document.querySelectorAll('.gemSel').forEach(s=>{
+      s.onchange = ()=>{
+        const cat = s.dataset.cat;
+        // 같은 항목 안 중복 지명 방지: 방금 고른 값과 겹치는 다른 칸 비우기
+        document.querySelectorAll(`.gemSel[data-cat="${cat}"]`).forEach(x=>{ if(x!==s && x.value && x.value===s.value) x.value=''; });
+        saveCat(cat);
+      };
+    });
+  }
 }
 
 /* 육각형 레이더 SVG */
-function hexSVG(gems){
+function hexSVG(gems, scale){
+  scale = Number(scale)||10;
   const cx=110, cy=110, R=88;
   const ang = i => (-90 + i*60) * Math.PI/180;
   const pt = (i,r)=>[cx + r*Math.cos(ang(i)), cy + r*Math.sin(ang(i))];
@@ -254,7 +293,7 @@ function hexSVG(gems){
     axes += `<line x1="${cx}" y1="${cy}" x2="${e[0].toFixed(1)}" y2="${e[1].toFixed(1)}" stroke="rgba(216,185,120,.18)"/>`;
     labels += `<text x="${l[0].toFixed(1)}" y="${l[1].toFixed(1)}" fill="var(--parch-dim)" font-size="11" text-anchor="middle" dominant-baseline="middle" font-family="Song Myung">${g.ko}</text>`;
   });
-  const vpts = GEMS.map((g,i)=>pt(i, R*(Number(gems[g.k])||0)/10).map(n=>n.toFixed(1)).join(',')).join(' ');
+  const vpts = GEMS.map((g,i)=>pt(i, R*(Number(gems[g.k])||0)/scale).map(n=>n.toFixed(1)).join(',')).join(' ');
   return `<svg viewBox="0 0 220 220" width="240" height="240">${grid}${axes}
     <polygon points="${vpts}" fill="rgba(216,185,120,.28)" stroke="var(--gold-bright)" stroke-width="2"/>
     ${labels}</svg>`;
@@ -266,7 +305,7 @@ async function renderAdmin(key){
   if(!d.ok){ clearSession(); return renderLogin(); }
 
   const ranked = [...d.players].sort((a,b)=> b.balance - a.balance);
-  const reveal = truthy(d.config.reveal_scores), voting = truthy(d.config.voting_open);
+  const reveal = truthy(d.config.reveal_scores), voting = truthy(d.config.voting_open), gemVoting = truthy(d.config.gem_voting_open);
   const winnerId = d.config.winner_id;
   const base = location.origin + location.pathname;
 
@@ -276,9 +315,10 @@ async function renderAdmin(key){
   html += `<div class="card"><h2 class="sec">집사 콘솔</h2>
     <div class="row" style="gap:18px">
       <label class="toggle"><input type="checkbox" id="tReveal" ${reveal?'checked':''}> 점수 공개</label>
-      <label class="toggle"><input type="checkbox" id="tVote" ${voting?'checked':''}> 투표 열기</label>
+      <label class="toggle"><input type="checkbox" id="tGemVote" ${gemVoting?'checked':''}> 항목 투표 열기</label>
+      <label class="toggle"><input type="checkbox" id="tVote" ${voting?'checked':''}> 스파이 투표 열기</label>
     </div>
-    <p class="hint" style="margin-top:10px">점수 공개를 켜면 영애들이 자기 육각형을 볼 수 있어요. 대관식 전까지는 꺼두는 걸 권해요.</p></div>`;
+    <p class="hint" style="margin-top:10px">항목 투표를 켜면 영애들이 6항목 1·2·3위를 지명하고, 그 결과로 점수가 자동 집계돼요. 점수 공개는 대관식 전까지 꺼두는 걸 권해요.</p></div>`;
 
   // 순위
   html += `<div class="card"><h2 class="sec">순위 (균형 점수)</h2><div class="scroll"><table>
@@ -288,12 +328,22 @@ async function renderAdmin(key){
       <td class="${idx===0?'rank1':''}">${idx+1}</td>
       <td class="name ${idx===0?'rank1':''}">${esc(p.princess||p.name)} ${p.is_owner?'🤫':''} ${p.is_leader?'👁':''}<div class="muted" style="font-size:11px">${esc(p.name||'')}</div></td>
       <td>${esc(p.pot||'')}</td>
-      ${GEMS.map(g=>`<td><input type="number" min="0" max="10" value="${p.gems[g.k]}" data-id="${esc(p.id)}" data-gem="${g.k}" class="scoreIn"></td>`).join('')}
+      ${GEMS.map(g=>`<td><input type="number" min="0" value="${p.gems[g.k]}" data-id="${esc(p.id)}" data-gem="${g.k}" class="scoreIn${p.overridden&&p.overridden[g.k]?' ov':''}" title="${p.overridden&&p.overridden[g.k]?'수동 고정 — 지우면 투표 집계값으로 복귀':'투표 집계값 — 숫자를 넣으면 수동 고정'}"></td>`).join('')}
       <td>${p.total}</td><td class="${idx===0?'rank1':''}">${p.balance}</td>
       <td><button class="sm winBtn ${String(winnerId)===String(p.id)?'gold':''}" data-id="${esc(p.id)}">${String(winnerId)===String(p.id)?'👑':'선택'}</button></td>
     </tr>`;
   });
-  html += `</table></div><p class="hint" style="margin-top:8px">숫자를 바꾸면 자동 저장돼요. 🤫=집사의 영애, 👁=팟장.</p></div>`;
+  html += `</table></div><p class="hint" style="margin-top:8px">점수는 항목별 투표로 자동 집계돼요. 칸에 <b>숫자를 넣으면 수동 고정(금색)</b>, <b>지우면 투표값으로 복귀</b>. 🤫=집사의 영애, 👁=팟장.</p></div>`;
+
+  // 항목별 투표 집계
+  html += `<div class="card"><h2 class="sec">항목별 투표 집계</h2><div class="scroll"><table>
+    <tr><th>항목</th><th>순위 (득점)</th></tr>
+    ${GEMS.map(g=>{
+      const list = (d.gem_tally && d.gem_tally[g.k]) || [];
+      const txt = list.length ? list.map((x,i)=>`${i+1}. ${esc(x.name)} (${x.points})`).join(' · ') : '<span class="muted">아직 투표 없음</span>';
+      return `<tr><td>${g.ko}</td><td class="name">${txt}</td></tr>`;
+    }).join('')}
+  </table></div><p class="hint" style="margin-top:8px">1위 5점 · 2위 3점 · 3위 1점. 위 순위표 점수는 이 집계(또는 수동 고정값)로 계산돼요.</p></div>`;
 
   // 역할/미션
   html += `<div class="card"><h2 class="sec">역할 · 비밀 미션</h2><div class="scroll"><table>
@@ -339,8 +389,9 @@ async function renderAdmin(key){
 function bindAdmin(key){
   const save = async (params)=>{ const r = await api(params.action, Object.assign({key},params), true); toast(r.ok?'저장됐어요':'오류: '+(r.error||'')); return r; };
 
-  document.getElementById('tReveal').onchange = e => save({action:'setToggle', name:'reveal_scores', value: e.target.checked});
-  document.getElementById('tVote').onchange   = e => save({action:'setToggle', name:'voting_open',   value: e.target.checked});
+  document.getElementById('tReveal').onchange  = e => save({action:'setToggle', name:'reveal_scores',   value: e.target.checked});
+  document.getElementById('tVote').onchange    = e => save({action:'setToggle', name:'voting_open',     value: e.target.checked});
+  document.getElementById('tGemVote').onchange = e => save({action:'setToggle', name:'gem_voting_open', value: e.target.checked});
 
   document.querySelectorAll('.scoreIn').forEach(inp=>{
     inp.onchange = ()=> save({action:'setScore', id:inp.dataset.id, gem:inp.dataset.gem, value:inp.value});
