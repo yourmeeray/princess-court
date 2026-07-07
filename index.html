@@ -94,7 +94,14 @@
   .inv-slide.locked{align-items:center;justify-content:center;text-align:center;gap:12px;
     color:var(--parch-dim);border-style:dashed;opacity:.5;filter:grayscale(.35)}
   .inv-slide.locked .lock{font-size:40px}
-  .inv-hint{font-size:11px;color:var(--parch-dim);text-align:center;letter-spacing:.06em}
+  .inv-wrap{position:relative}
+  .inv-nav{position:absolute;top:calc(50% - 6px);transform:translateY(-50%);z-index:5;
+    width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(24,17,38,.82);border:1px solid var(--gold);color:var(--gold-bright);
+    font-size:22px;line-height:1;padding:0 0 3px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .inv-nav:hover{background:var(--gold);color:#241a06;border-color:var(--gold)}
+  .inv-nav.prev{left:-4px}
+  .inv-nav.next{right:-4px}
 </style>
 </head>
 <body>
@@ -236,9 +243,13 @@ async function renderPlayer(id, key){
         ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:`<div class="inv-mission muted">이 자리의 미션은 곧 전해집니다.</div>`}
       </div>`;
     });
+    const nav = d.invitations.length>1;
     html += `<div class="card"><h2 class="sec">초대장</h2>
-      <div class="inv-carousel" id="invCarousel">${slides}</div>
-      <div class="inv-hint">← 좌우로 넘겨보세요 →</div></div>`;
+      <div class="inv-wrap">
+        ${nav?`<button class="inv-nav prev" id="invPrev" aria-label="이전 초대장">‹</button>`:''}
+        <div class="inv-carousel" id="invCarousel">${slides}</div>
+        ${nav?`<button class="inv-nav next" id="invNext" aria-label="다음 초대장">›</button>`:''}
+      </div></div>`;
   }
 
   // 우승 발표
@@ -300,13 +311,17 @@ async function renderPlayer(id, key){
   app.innerHTML = html + logoutBar();
   bindLogout();
 
-  // 캐러셀: 가장 최근(오더 큰) 공개된 초대장으로 스크롤
+  // 캐러셀: 가장 최근(오더 큰) 공개된 초대장으로 스크롤 + 화살표 조작
   const car = document.getElementById('invCarousel');
   if(car && d.invitations){
     let target = -1;
     d.invitations.forEach((inv,i)=>{ if(!inv.locked) target = i; });
     const s = car.querySelectorAll('.inv-slide')[target];
     if(s) car.scrollLeft = s.offsetLeft - (car.clientWidth - s.clientWidth)/2;
+    const step = ()=>{ const s0 = car.querySelector('.inv-slide'); return s0 ? s0.offsetWidth + 14 : car.clientWidth; };
+    const prev = document.getElementById('invPrev'), next = document.getElementById('invNext');
+    if(prev) prev.onclick = ()=> car.scrollBy({left:-step(), behavior:'smooth'});
+    if(next) next.onclick = ()=> car.scrollBy({left: step(), behavior:'smooth'});
   }
 
   if(d.voting_open){
