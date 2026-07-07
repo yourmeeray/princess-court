@@ -100,7 +100,8 @@
     font-family:'Song Myung',serif;font-size:13px;letter-spacing:.04em}
   .inv-badges{margin-top:2px}
   .gembadge{display:inline-block;font-size:11px;color:var(--gold);border:1px solid var(--line);
-    border-radius:12px;padding:2px 8px;margin-right:4px}
+    border-radius:12px;padding:3px 10px;margin:0 5px 7px 0}
+  .inv-badges{line-height:2}
   .inv-title{font-family:'Song Myung',serif;color:var(--gold-bright);font-size:17px;letter-spacing:.04em}
   .inv-meta{font-size:12px;color:var(--parch-dim)}
   .inv-desc{font-size:16px;line-height:2.15}
@@ -118,7 +119,7 @@
   .inv-nav.prev{left:-4px}
   .inv-nav.next{right:-4px}
   /* 봉투 카드 */
-  .inv-slide.env{align-items:center;justify-content:center;text-align:center;gap:8px;cursor:pointer;min-height:196px}
+  .inv-slide.env{align-items:center;justify-content:center;text-align:center;gap:12px;cursor:pointer;min-height:200px}
   .inv-slide.env .inv-badges{margin-top:0}
   .env-note{color:var(--gold);font-size:13px;margin-top:2px}
   .env-open{margin-top:6px}
@@ -185,9 +186,9 @@ function invModal(inv){
   back.className = 'modal-back';
   back.innerHTML = `<div class="modal-letter">
     <button class="modal-x" aria-label="닫기">✕</button>
-    <div class="inv-badges">${gemBadges(inv.gem)}</div>
-    <div class="inv-title" style="font-size:20px">${esc(inv.title||'')}</div>
-    <div class="inv-meta" style="margin-bottom:8px">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
+    <div class="inv-badges" style="margin-bottom:16px">${gemBadges(inv.gem)}</div>
+    <div class="inv-title" style="font-size:21px;margin-bottom:9px">${esc(inv.title||'')}</div>
+    <div class="inv-meta" style="margin-bottom:22px">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
     ${hero}
     ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
     ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
