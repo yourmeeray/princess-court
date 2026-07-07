@@ -148,7 +148,7 @@ function gemBadges(gemStr){
 function formatCopy(raw){
   const lines = String(raw==null?'':raw).split('\n');
   let out = '', para = [];
-  const flush = ()=>{ if(para.length){ out += `<p>${para.join('<br>')}</p>`; para = []; } };
+  const flush = ()=>{ if(para.length){ out += `<p>${para.join(' ')}</p>`; para = []; } };
   lines.forEach(ln=>{
     const t = ln.trim(); let m;
     if(t === ''){ flush(); }
