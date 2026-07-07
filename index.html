@@ -275,7 +275,7 @@ async function renderPlayer(id, key){
         <div class="inv-meta">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
         ${hero}
         ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
-        ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:`<div class="inv-mission muted">이 자리의 미션은 곧 전해집니다.</div>`}
+        ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
       </div>`;
     });
     const nav = d.invitations.length>1;
