@@ -71,7 +71,7 @@
   .hint{font-size:12px;color:var(--parch-dim);line-height:1.7}
   /* 초대장 캐러셀 */
   .inv-carousel{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;
-    padding:2px 2px 12px;-webkit-overflow-scrolling:touch}
+    padding:2px 7% 12px;scroll-padding:0 7%;-webkit-overflow-scrolling:touch}
   .inv-carousel::-webkit-scrollbar{height:6px}
   .inv-carousel::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
   .inv-slide{flex:0 0 86%;scroll-snap-align:center;box-sizing:border-box;
@@ -117,6 +117,21 @@
   .inv-nav:hover{background:var(--gold);color:#241a06;border-color:var(--gold)}
   .inv-nav.prev{left:-4px}
   .inv-nav.next{right:-4px}
+  /* 봉투 카드 */
+  .inv-slide.env{align-items:center;justify-content:center;text-align:center;gap:8px;cursor:pointer;min-height:196px}
+  .inv-slide.env .inv-badges{margin-top:0}
+  .env-note{color:var(--gold);font-size:13px;margin-top:2px}
+  .env-open{margin-top:6px}
+  /* 초대장 모달 */
+  .modal-back{position:fixed;inset:0;background:rgba(6,5,12,.72);display:flex;align-items:center;
+    justify-content:center;padding:20px;z-index:100}
+  .modal-letter{position:relative;max-width:460px;width:100%;max-height:86vh;overflow-y:auto;
+    background:linear-gradient(180deg,var(--velvet-2),var(--velvet));border:1px solid var(--gold);
+    border-radius:16px;padding:24px 20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .modal-letter .inv-hero.copy{max-height:none}
+  .modal-x{position:absolute;top:10px;right:10px;width:30px;height:30px;border-radius:50%;
+    background:rgba(0,0,0,.2);border:1px solid var(--line);color:var(--parch);font-size:14px;cursor:pointer;padding:0}
+  .modal-x:hover{border-color:var(--gold);color:var(--gold-bright)}
 </style>
 </head>
 <body>
@@ -158,6 +173,29 @@ function formatCopy(raw){
   });
   flush();
   return out;
+}
+/* 초대장 모달 열기 */
+function invModal(inv){
+  if(!inv) return;
+  const meta = [esc(inv.time||''), esc(inv.place||'')].filter(Boolean).join(' · ');
+  const hero = inv.image
+    ? `<img src="${esc(inv.image)}" class="inv-hero" alt="">`
+    : (inv.description ? `<div class="inv-hero copy">${formatCopy(inv.description)}</div>` : '');
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal-letter">
+    <button class="modal-x" aria-label="닫기">✕</button>
+    <div class="inv-badges">${gemBadges(inv.gem)}</div>
+    <div class="inv-title" style="font-size:20px">${esc(inv.title||'')}</div>
+    <div class="inv-meta" style="margin-bottom:8px">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
+    ${hero}
+    ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
+    ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
+  </div>`;
+  const close = ()=> back.remove();
+  back.onclick = e=>{ if(e.target===back) close(); };
+  back.querySelector('.modal-x').onclick = close;
+  document.body.appendChild(back);
 }
 
 const qs = new URLSearchParams(location.search);
@@ -257,25 +295,18 @@ async function renderPlayer(id, key){
   // 초대장 (좌우 캐러셀)
   if(d.invitations && d.invitations.length){
     let slides = '';
-    d.invitations.forEach(inv=>{
+    d.invitations.forEach((inv,idx)=>{
       if(inv.locked){
         slides += `<div class="inv-slide locked"><span class="lock">🔒</span><div>봉인된 초대장<br><span style="font-size:11px">집사가 열면 공개됩니다</span></div></div>`;
         return;
       }
       const meta = [esc(inv.time||''), esc(inv.place||'')].filter(Boolean).join(' · ');
-      // 이미지 자리: 이미지가 있으면 이미지, 없으면 문구(description) 패널
-      const hero = inv.image
-        ? `<img src="${esc(inv.image)}" class="inv-hero" alt="">`
-        : (inv.description
-            ? `<div class="inv-hero copy">${formatCopy(inv.description)}</div>`
-            : `<div class="inv-hero ph"></div>`);
-      slides += `<div class="inv-slide">
+      slides += `<div class="inv-slide env" data-idx="${idx}" role="button" tabindex="0">
         <div class="inv-badges">${gemBadges(inv.gem)}</div>
         <div class="inv-title">${esc(inv.title||'')}</div>
-        <div class="inv-meta">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
-        ${hero}
-        ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
-        ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
+        <div class="inv-meta">${meta}</div>
+        <div class="env-note">✉️ 초대장이 도착했습니다</div>
+        <button class="gold sm env-open" type="button">열어보기</button>
       </div>`;
     });
     const nav = d.invitations.length>1;
@@ -357,6 +388,12 @@ async function renderPlayer(id, key){
     const prev = document.getElementById('invPrev'), next = document.getElementById('invNext');
     if(prev) prev.onclick = ()=> car.scrollBy({left:-step(), behavior:'smooth'});
     if(next) next.onclick = ()=> car.scrollBy({left: step(), behavior:'smooth'});
+    // 봉투 클릭 → 모달로 편지 열기
+    car.querySelectorAll('.inv-slide.env').forEach(el=>{
+      const open = ()=> invModal(d.invitations[+el.dataset.idx]);
+      el.onclick = open;
+      el.onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
+    });
   }
 
   if(d.voting_open){
