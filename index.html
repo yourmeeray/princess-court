@@ -90,6 +90,14 @@
       linear-gradient(160deg,var(--velvet-2),var(--velvet))}
   .inv-hero.copy::-webkit-scrollbar{width:6px}
   .inv-hero.copy::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+  .inv-hero.copy p,.inv-desc p{margin:0 0 10px}
+  .inv-hero.copy p:last-child,.inv-desc p:last-child{margin-bottom:0}
+  .inv-sec{display:flex;align-items:center;gap:8px;margin:15px 0 9px;color:var(--gold)}
+  .inv-sec::before,.inv-sec::after{content:'';flex:1;height:1px;
+    background:linear-gradient(90deg,rgba(216,185,120,0),var(--gold-deep),rgba(216,185,120,0))}
+  .inv-sec span{font-family:'Song Myung',serif;font-size:12px;letter-spacing:.14em;white-space:nowrap}
+  .inv-sign{margin-top:14px;text-align:right;color:var(--gold-bright);
+    font-family:'Song Myung',serif;font-size:13px;letter-spacing:.04em}
   .inv-badges{margin-top:2px}
   .gembadge{display:inline-block;font-size:11px;color:var(--gold);border:1px solid var(--line);
     border-radius:12px;padding:2px 8px;margin-right:4px}
@@ -135,6 +143,21 @@ function gemBadges(gemStr){
   return String(gemStr||'').split(',').map(s=>s.trim()).filter(Boolean).map(k=>{
     const g = GEMS.find(x=>x.k===k); return g?`<span class="gembadge">${g.em} ${g.ko}</span>`:'';
   }).join(' ');
+}
+/* 초대장 문구를 편지처럼 꾸며 렌더 (── 제목 ── → 구분선 라벨, — 서명 → 서명) */
+function formatCopy(raw){
+  const lines = String(raw==null?'':raw).split('\n');
+  let out = '', para = [];
+  const flush = ()=>{ if(para.length){ out += `<p>${para.join('<br>')}</p>`; para = []; } };
+  lines.forEach(ln=>{
+    const t = ln.trim(); let m;
+    if(t === ''){ flush(); }
+    else if((m = t.match(/^[─—–-]{2,}\s*(.+?)\s*[─—–-]{2,}$/))){ flush(); out += `<div class="inv-sec"><span>${esc(m[1])}</span></div>`; }
+    else if(/^[—–]\s/.test(t)){ flush(); out += `<div class="inv-sign">${esc(t)}</div>`; }
+    else { para.push(esc(t)); }
+  });
+  flush();
+  return out;
 }
 
 const qs = new URLSearchParams(location.search);
@@ -244,14 +267,14 @@ async function renderPlayer(id, key){
       const hero = inv.image
         ? `<img src="${esc(inv.image)}" class="inv-hero" alt="">`
         : (inv.description
-            ? `<div class="inv-hero copy">${esc(inv.description).replace(/\n/g,'<br>')}</div>`
+            ? `<div class="inv-hero copy">${formatCopy(inv.description)}</div>`
             : `<div class="inv-hero ph"></div>`);
       slides += `<div class="inv-slide">
         <div class="inv-badges">${gemBadges(inv.gem)}</div>
         <div class="inv-title">${esc(inv.title||'')}</div>
         <div class="inv-meta">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
         ${hero}
-        ${inv.image&&inv.description?`<p class="inv-desc">${esc(inv.description).replace(/\n/g,'<br>')}</p>`:''}
+        ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
         ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:`<div class="inv-mission muted">이 자리의 미션은 곧 전해집니다.</div>`}
       </div>`;
     });
