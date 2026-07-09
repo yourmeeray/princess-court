@@ -307,6 +307,21 @@ function renderQuizCard(q){
   return `<div class="card">${inner}</div>`;
 }
 
+/* 챔피언 점수표 카드 (균형 1위 / 합계 1위) */
+function champCard(title, c, scale){
+  if(!c) return '';
+  let rows = '';
+  GEMS.forEach(g=>{ rows += `<div class="gemrow"><span>${g.em} ${g.ko}</span><b>${c.gems[g.k]}점</b></div>`; });
+  return `<div class="card">
+    <h2 class="sec">${title}</h2>
+    <div style="font-family:'Song Myung';font-size:20px;color:var(--gold-bright);text-align:center;margin-bottom:4px">${esc(c.princess)}</div>
+    <div class="hexwrap">${hexSVG(c.gems, scale)}</div>
+    ${rows}
+    <div class="gemrow" style="border:none;margin-top:8px"><span>합계</span><b>${c.total}</b></div>
+    <div class="gemrow" style="border:none"><span>균형 점수</span><b style="color:var(--gold-bright)">${c.balance}</b></div>
+  </div>`;
+}
+
 /* ---------------- 영애 화면 ---------------- */
 async function renderPlayer(id, key){
   if(playerTimer){ clearInterval(playerTimer); playerTimer=null; }
@@ -365,6 +380,12 @@ async function renderPlayer(id, key){
              <p class="hint" style="margin-top:8px">점수는 항목별 투표로 산정돼요. 균형 점수 = 합계 − (최고−최저). 고르게 빛날수록 높아요.</p></div>`;
   } else {
     html += `<div class="card center"><p class="muted">점수는 대관식에서 공개됩니다. ✨</p></div>`;
+  }
+
+  // 전체 점수판 — 챔피언 2명 (공개 시)
+  if(d.reveal && d.champions){
+    html += champCard('👑 가장 고르게 빛난 분 · 균형 1위', d.champions.balance, d.scale);
+    html += champCard('✨ 최고 점수 · 합계 1위', d.champions.score, d.scale);
   }
 
   // 비밀 미션 (집사의 영애만)
