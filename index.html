@@ -363,9 +363,10 @@ function renderQuizCard(q){
   let inner = `<h2 class="sec">${esc(q.label||'퀴즈')}</h2>${meta}${quizMedia(q.media)}`;
   if(q.revealed){
     if(q.answer) inner += `<p class="hint" style="margin:6px 0 12px">정답: <b style="color:var(--gold-bright)">${esc(q.answer)}</b></p>`;
-    inner += `<div class="scroll"><table><tr><th>영애</th><th>답변</th></tr>${
-      (q.responses||[]).map(r=>`<tr><td class="name">${esc(r.name)}${r.hint?' <span class="pill">힌트</span>':''}</td><td>${esc(r.answer)}</td></tr>`).join('')
-    }</table></div>`;
+    inner += (q.responses||[]).map(r=>`<div style="padding:9px 0;border-bottom:1px dashed rgba(216,185,120,.15)">
+      <div style="color:var(--gold);font-size:13px">${esc(r.name)}${r.hint?' <span class="pill">힌트</span>':''}</div>
+      <div style="font-size:15px;line-height:1.7;margin-top:3px">${esc(r.answer)}</div>
+    </div>`).join('');
     return `<div class="card">${inner}</div>`;
   }
   if(q.my_hint && q.media2){
