@@ -221,6 +221,7 @@ function invModal(inv, ctx){
     <div class="inv-meta" style="margin-bottom:22px">${meta}${inv.address?`<br><span style="font-size:11px">${esc(inv.address)}</span>`:''}</div>
     ${hero}
     ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
+    ${inv.pot_note?`<div class="inv-mission">🚕 ${esc(inv.pot_note).replace(/\n/g,'<br>')}</div>`:''}
     ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
     ${voteHTML}
   </div>`;
