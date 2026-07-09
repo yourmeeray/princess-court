@@ -382,8 +382,8 @@ async function renderPlayer(id, key){
     html += `<div class="card center"><p class="muted">점수는 대관식에서 공개됩니다. ✨</p></div>`;
   }
 
-  // 전체 점수판 — 챔피언 2명 (공개 시)
-  if(d.reveal && d.champions){
+  // 전체 점수판 — 챔피언 2명 (공개 시, 전원 0점이면 숨김)
+  if(d.reveal && d.champions && d.champions.score && d.champions.score.total > 0){
     html += champCard('👑 가장 고르게 빛난 분 · 균형 1위', d.champions.balance, d.scale);
     html += champCard('✨ 최고 점수 · 합계 1위', d.champions.score, d.scale);
   }
