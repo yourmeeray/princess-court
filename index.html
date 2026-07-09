@@ -546,6 +546,8 @@ async function renderPlayer(id, key){
     playerTimer = setInterval(()=>{
       const a = document.activeElement;
       if(a && a.classList && a.classList.contains('quizAns')) return;
+      // 음원 재생 중엔 갱신 보류 (재생이 끊기지 않게)
+      if([...document.querySelectorAll('audio')].some(x=>!x.paused && !x.ended)) return;
       renderPlayer(id, key);
     }, 5000);
   }
