@@ -347,7 +347,7 @@ function renderQuizCard(q){
   const badge = q.gem ? gemBadges(q.gem) : '';
   const half = (q.max!==''&&q.max!=null) ? Math.floor(Number(q.max)/2) : 0;
   const pts = (q.max!=='' && q.max!=null)
-    ? `<span class="gembadge">${esc(q.max)}점${q.has_hint?` · 힌트 시 ${half}점`:''}</span>`
+    ? `<span class="gembadge">${esc(q.max)}점${q.has_hint?` · 힌트 시 ${half}점`:''}${q.min_len?` · ${esc(q.min_len)}자 미만 ${half}점`:''}</span>`
     : (q.gem?'':`<span class="gembadge">점수 미반영</span>`);
   const meta = (badge||pts) ? `<div class="inv-badges" style="margin-bottom:10px">${badge} ${pts}</div>` : '';
   let inner = `<h2 class="sec">${esc(q.label||'퀴즈')}</h2>${meta}${quizMedia(q.media)}`;
@@ -668,8 +668,13 @@ async function renderAdmin(key){
         if(q.max===''||q.max==null)
           return `<td><input type="number" min="0" value="${v!=null?esc(v):''}" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" class="quizIn"></td>`;
         const ent = ((d.quiz_answers&&d.quiz_answers[q.quiz_id])||[]).find(a=>String(a.pid)===String(p.id));
-        const pmax = ent&&ent.hint ? Math.floor(Number(q.max)/2) : Number(q.max);
-        return `<td><input type="checkbox" class="quizOX" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" data-max="${pmax}" ${Number(v)>0?'checked':''} title="${ent&&ent.hint?`힌트 사용 — 체크 시 ${pmax}점`:`체크 시 ${pmax}점`}">${ent&&ent.hint?'<span style="font-size:10px">🔔</span>':''}</td>`;
+        let pmax = Number(q.max);
+        if(ent&&ent.hint) pmax = Math.floor(pmax/2);
+        const alen = ent ? String(ent.answer||'').replace(/\s/g,'').length : 0;
+        const short = q.min_len!==''&&q.min_len!=null&&ent&&alen<Number(q.min_len);
+        if(short) pmax = Math.floor(pmax/2);
+        const notes = [ent&&ent.hint?'힌트 사용':'', q.min_len!==''&&q.min_len!=null&&ent?`${alen}자${short?' (기준 미달)':''}`:''].filter(Boolean).join(' · ');
+        return `<td><input type="checkbox" class="quizOX" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" data-max="${pmax}" ${Number(v)>0?'checked':''} title="${notes?notes+' — ':''}체크 시 ${pmax}점">${ent&&ent.hint?'<span style="font-size:10px">🔔</span>':''}${short?'<span style="font-size:10px">✂️</span>':''}</td>`;
       }).join('')}</tr>`;
     });
     html += `</table></div><p class="hint" style="margin-top:8px">gem이 wit인 퀴즈 합=지혜, charm 합=매력. <b>체크=정답(배점 자동 부여, 🔔 힌트 사용자는 절반), 해제=0점.</b> 배점 없는 퀴즈만 숫자 직접 입력. 바꾸면 자동 저장돼요.</p>`;
