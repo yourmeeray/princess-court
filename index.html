@@ -200,6 +200,7 @@ function invModal(inv){
 
 const qs = new URLSearchParams(location.search);
 const app = document.getElementById('app');
+let playerTimer = null, adminTimer = null;  // 퀴즈 제출 현황 폴링용
 
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
 
@@ -222,7 +223,7 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;',
 function saveSession(s){ try{ localStorage.setItem('court_session', JSON.stringify(s)); }catch(e){} }
 function loadSession(){ try{ return JSON.parse(localStorage.getItem('court_session')); }catch(e){ return null; } }
 function clearSession(){ try{ localStorage.removeItem('court_session'); }catch(e){} }
-function logout(){ clearSession(); renderLogin(); }
+function logout(){ if(playerTimer){clearInterval(playerTimer);playerTimer=null;} if(adminTimer){clearInterval(adminTimer);adminTimer=null;} clearSession(); renderLogin(); }
 function logoutBar(){ return `<div class="center" style="margin-top:6px"><button class="sm" id="logoutBtn">로그아웃</button></div>`; }
 function bindLogout(){ const b=document.getElementById('logoutBtn'); if(b) b.onclick=logout; }
 
@@ -281,8 +282,34 @@ async function renderLogin(){
   document.getElementById('pw').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 }
 
+/* 퀴즈 미디어: 오디오 확장자면 플레이어, 아니면 이미지 */
+function quizMedia(url){
+  if(!url) return '';
+  if(/\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(url)) return `<audio controls preload="none" src="${esc(url)}" style="width:100%;margin:10px 0"></audio>`;
+  return `<img src="${esc(url)}" alt="" style="width:100%;border-radius:12px;margin:10px 0">`;
+}
+/* 영애 화면 퀴즈 카드 (제출 단계 / 공개 단계) */
+function renderQuizCard(q){
+  const badge = q.gem ? gemBadges(q.gem) : '';
+  const pts = (q.max!=='' && q.max!=null) ? `<span class="gembadge">${esc(q.max)}점</span>` : (q.gem?'':`<span class="gembadge">점수 미반영</span>`);
+  const meta = (badge||pts) ? `<div class="inv-badges" style="margin-bottom:10px">${badge} ${pts}</div>` : '';
+  let inner = `<h2 class="sec">${esc(q.label||'퀴즈')}</h2>${meta}${quizMedia(q.media)}`;
+  if(q.revealed){
+    if(q.answer) inner += `<p class="hint" style="margin:6px 0 12px">정답: <b style="color:var(--gold-bright)">${esc(q.answer)}</b></p>`;
+    inner += `<div class="scroll"><table><tr><th>영애</th><th>답변</th></tr>${
+      (q.responses||[]).map(r=>`<tr><td class="name">${esc(r.name)}</td><td>${esc(r.answer)}</td></tr>`).join('')
+    }</table></div>`;
+    return `<div class="card">${inner}</div>`;
+  }
+  inner += `<input type="text" id="qans_${esc(q.quiz_id)}" class="quizAns" placeholder="정답을 적어주세요" value="${esc(q.my_answer||'')}" style="width:100%">
+    <div class="center" style="margin-top:10px"><button class="gold sm quizSub" data-qid="${esc(q.quiz_id)}">${q.my_answer?'답변 수정':'제출'}</button></div>
+    <p class="hint center" style="margin-top:10px">${q.my_answer?'제출 완료 🤍 · ':''}${q.submitted}/${q.total}명 제출${q.my_answer?' · 모두 제출하면 집사가 정답을 공개합니다':''}</p>`;
+  return `<div class="card">${inner}</div>`;
+}
+
 /* ---------------- 영애 화면 ---------------- */
 async function renderPlayer(id, key){
+  if(playerTimer){ clearInterval(playerTimer); playerTimer=null; }
   const d = await api('me', {id, key});
   if(!d.ok){ clearSession(); return renderLogin(); }
 
@@ -315,6 +342,11 @@ async function renderPlayer(id, key){
         ${nav?`<div class="inv-navs"><button class="inv-nav" id="invPrev" aria-label="이전 초대장">‹</button><button class="inv-nav" id="invNext" aria-label="다음 초대장">›</button></div>`:''}
       </div>
       <div class="inv-carousel" id="invCarousel">${slides}</div></div>`;
+  }
+
+  // 활성 퀴즈 (제출 / 공개)
+  if(d.quizzes && d.quizzes.length){
+    d.quizzes.forEach(q=>{ html += renderQuizCard(q); });
   }
 
   // 우승 발표
@@ -425,6 +457,29 @@ async function renderPlayer(id, key){
       };
     });
   }
+
+  // 퀴즈 답 제출
+  document.querySelectorAll('.quizSub').forEach(b=>{
+    b.onclick = async ()=>{
+      const qid = b.dataset.qid;
+      const ans = (document.getElementById('qans_'+qid)||{}).value || '';
+      if(!ans.trim()){ toast('답을 적어주세요'); return; }
+      const r = await api('submitAnswer', {id, key, quiz_id:qid, answer:ans}, true);
+      if(r.ok){ toast('제출 완료 🤍'); renderPlayer(id, key); }
+      else { toast(r.error==='submit_closed'?'제출이 마감되었어요':(r.error==='revealed'?'이미 공개되었어요':'오류가 발생했어요')); }
+    };
+  });
+
+  // 제출 진행 중인 퀴즈가 있으면 5초마다 새로고침(제출 현황·정답 공개·초대장 등장 반영).
+  // 입력 중이면 건너뜀(타이핑 중 내용 날아감 방지).
+  const quizLive = (d.quizzes||[]).some(q=>q.submit_open && !q.revealed);
+  if(quizLive){
+    playerTimer = setInterval(()=>{
+      const a = document.activeElement;
+      if(a && a.classList && a.classList.contains('quizAns')) return;
+      renderPlayer(id, key);
+    }, 5000);
+  }
 }
 
 /* 육각형 레이더 SVG */
@@ -452,6 +507,7 @@ function hexSVG(gems, scale){
 
 /* ---------------- 집사(admin) 화면 ---------------- */
 async function renderAdmin(key){
+  if(adminTimer){ clearInterval(adminTimer); adminTimer=null; }
   const d = await api('all', {key});
   if(!d.ok){ clearSession(); return renderLogin(); }
 
@@ -515,6 +571,28 @@ async function renderAdmin(key){
   }
   html += `</div>`;
 
+  // 퀴즈 진행 (제출 · 공개)
+  html += `<div class="card"><h2 class="sec">퀴즈 진행 (제출 · 공개)</h2>`;
+  if(!d.quizzes || !d.quizzes.length){ html += `<p class="muted">Quizzes 탭이 아직 없어요.</p>`; }
+  else {
+    d.quizzes.forEach(q=>{
+      const ans = (d.quiz_answers && d.quiz_answers[q.quiz_id]) || [];
+      html += `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+        <div class="row" style="justify-content:space-between">
+          <b>${esc(q.label||q.quiz_id)}</b>
+          <span class="muted" style="font-size:12px">${ans.length}/${d.players.length} 제출</span>
+        </div>
+        <div class="row" style="gap:16px;margin-top:8px">
+          <label class="toggle"><input type="checkbox" class="qOpen" data-qid="${esc(q.quiz_id)}" ${truthy(q.submit_open)?'checked':''}> 제출 받기</label>
+          <label class="toggle"><input type="checkbox" class="qReveal" data-qid="${esc(q.quiz_id)}" ${truthy(q.revealed)?'checked':''}> 정답 공개${q.reveal_inv?` (+ ${esc(q.reveal_inv)} 초대장)`:''}</label>
+        </div>
+        ${ans.length?`<div class="scroll" style="margin-top:8px"><table><tr><th>영애</th><th>답변</th></tr>${ans.map(a=>`<tr><td class="name">${esc(a.name)}</td><td>${esc(a.answer)}</td></tr>`).join('')}</table></div>`:''}
+      </div>`;
+    });
+    html += `<p class="hint">"제출 받기"를 켜면 영애 화면에 퀴즈가 떠요. 모두 제출되면 "정답 공개"를 켜세요(연결된 초대장이 있으면 함께 열립니다). 이 화면은 제출 중 자동 새로고침돼요.</p>`;
+  }
+  html += `</div>`;
+
   // 퀴즈 점수 (지혜·매력)
   html += `<div class="card"><h2 class="sec">퀴즈 점수 (지혜·매력)</h2>`;
   if(!d.quizzes || !d.quizzes.length){ html += `<p class="muted">Quizzes 탭이 아직 없어요.</p>`; }
@@ -567,6 +645,16 @@ async function renderAdmin(key){
   app.innerHTML = html + logoutBar();
   bindAdmin(key);
   bindLogout();
+
+  // 제출 받는 중인 퀴즈가 있으면 6초마다 현황 새로고침(입력 편집 중이면 건너뜀).
+  const quizLive = (d.quizzes||[]).some(q=>truthy(q.submit_open) && !truthy(q.revealed));
+  if(quizLive){
+    adminTimer = setInterval(()=>{
+      const a = document.activeElement;
+      if(a && (a.tagName==='INPUT' || a.tagName==='SELECT')) return;
+      renderAdmin(key);
+    }, 6000);
+  }
 }
 
 function bindAdmin(key){
@@ -602,6 +690,12 @@ function bindAdmin(key){
   });
   document.querySelectorAll('.quizIn').forEach(inp=>{
     inp.onchange = ()=> save({action:'setQuizScore', player_id:inp.dataset.pid, quiz_id:inp.dataset.qid, value:inp.value});
+  });
+  document.querySelectorAll('.qOpen').forEach(c=>{
+    c.onchange = ()=> save({action:'setQuizFlag', quiz_id:c.dataset.qid, field:'submit_open', value:c.checked});
+  });
+  document.querySelectorAll('.qReveal').forEach(c=>{
+    c.onchange = async ()=>{ await save({action:'setQuizFlag', quiz_id:c.dataset.qid, field:'revealed', value:c.checked}); setTimeout(()=>renderAdmin(key),400); };
   });
 }
 
