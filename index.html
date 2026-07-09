@@ -223,11 +223,13 @@ function invModal(inv, ctx){
     ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
     ${inv.pot_note?`<div class="inv-mission">🚕 ${esc(inv.pot_note).replace(/\n/g,'<br>')}</div>`:''}
     ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
+    <div class="center" style="margin-top:20px"><button class="sm modal-close-btn" type="button">닫기</button></div>
     ${voteHTML}
   </div>`;
   const close = ()=> back.remove();
   back.onclick = e=>{ if(e.target===back) close(); };
   back.querySelector('.modal-x').onclick = close;
+  back.querySelector('.modal-close-btn').onclick = close;
 
   // 같은 항목 안 중복 지명 방지
   back.querySelectorAll('.ivSel').forEach(s=>{
