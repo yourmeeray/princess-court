@@ -200,11 +200,11 @@ function invModal(inv, ctx){
         </select>`;
       return `<div class="inv-vote" data-cat="${gk}">
         <div class="inv-sec"><span>${g?g.em+' '+g.ko:''} 투표</span></div>
-        <p class="hint" style="margin-bottom:10px">${esc(prompt)}<br><b>1위 ${RP[0]}점 · 2위 ${RP[1]}점 · 3위 ${RP[2]}점</b> (본인 제외)</p>
+        <p style="font-size:15px;line-height:1.9;color:var(--parch);margin-bottom:12px">${esc(prompt)}<br><b style="color:var(--gold-bright)">1위 ${RP[0]}점 · 2위 ${RP[1]}점 · 3위 ${RP[2]}점</b> <span class="muted" style="font-size:13px">(본인 제외)</span></p>
         <div class="row" style="justify-content:center">
-          <span class="muted" style="font-size:12px">1위</span>${sel(1,mv[0])}
-          <span class="muted" style="font-size:12px">2위</span>${sel(2,mv[1])}
-          <span class="muted" style="font-size:12px">3위</span>${sel(3,mv[2])}
+          <span style="font-size:14px;color:var(--gold)">1위</span>${sel(1,mv[0])}
+          <span style="font-size:14px;color:var(--gold)">2위</span>${sel(2,mv[1])}
+          <span style="font-size:14px;color:var(--gold)">3위</span>${sel(3,mv[2])}
         </div>
         <div class="center" style="margin-top:12px"><button class="gold sm ivSubmit" data-cat="${gk}">투표 제출</button></div>
         <p class="hint center ivMsg" style="margin-top:8px">${(mv[0]||mv[1]||mv[2])?'제출 완료 🤍 · 바꾸려면 다시 제출':''}</p>
