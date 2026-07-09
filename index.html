@@ -37,6 +37,8 @@
     border:1px solid var(--line);background:rgba(216,185,120,.08);color:var(--parch);
     padding:9px 14px;font-size:14px;transition:.2s}
   button:hover{border-color:var(--gold);background:rgba(216,185,120,.16)}
+  button:disabled{opacity:.45;cursor:default;pointer-events:none}
+  button:disabled.on{opacity:1}
   button.gold{background:var(--gold);color:#241a06;border-color:var(--gold);font-weight:700}
   button.sm{padding:5px 10px;font-size:12.5px}
   input,select{font-family:"Gowun Batang",serif;background:rgba(0,0,0,.25);
@@ -194,14 +196,15 @@ function invModal(inv, ctx){
   // 이 초대장의 항목 투표 (투표 열림 + 이 초대장이 vote-gem일 때만)
   let voteHTML = '';
   const voteGems = String(inv.gem||'').split(',').map(s=>s.trim()).filter(k=>VOTE_GEMS.includes(k));
-  if(ctx.gem_voting_open && voteGems.length){
+  // vote_prompt가 있는 초대장만 투표를 가짐 (intro·대관식처럼 6보석 배지만 있는 초대장 제외)
+  if(ctx.gem_voting_open && voteGems.length && inv.vote_prompt){
     const cand = ctx.others || [];
     const mgv = ctx.my_gem_votes || {};
     const RP = ctx.rank_points || [5,3,1];
     voteHTML = voteGems.map(gk=>{
       const g = GEMS.find(x=>x.k===gk);
       const mv = mgv[gk] || ['','',''];
-      const prompt = inv.vote_prompt || `이 자리에서 ${g?g.ko:''}이 가장 빛난 영애를 1·2·3위로 뽑아주세요.`;
+      const prompt = inv.vote_prompt;
       const sel = (rank,val)=>`<select class="ivSel" data-cat="${gk}" data-rank="${rank}">
           <option value="">—</option>
           ${cand.map(o=>`<option value="${esc(o.id)}" ${String(val)===String(o.id)?'selected':''}>${esc(o.princess)}</option>`).join('')}
@@ -471,11 +474,11 @@ async function renderPlayer(id, key){
   // 투표
   if(d.voting_open){
     html += `<div class="card"><h2 class="sec">집사의 영애는 누구일까요?</h2>
-      <p class="hint">하루를 돌아보고, 집사가 남몰래 모신 단 한 분을 지목해 주세요.</p>
+      <p class="hint">하루를 돌아보고, 집사가 남몰래 모신 단 한 분을 지목해 주세요.<br><b>지목은 단 한 번 — 무를 수 없습니다.</b></p>
       <div class="vote-grid" id="voteGrid">${
-        d.others.map(o=>`<button data-id="${esc(o.id)}" class="voteBtn ${d.voted&&d.my_guess===o.id?'on':''}">${esc(o.princess)}</button>`).join('')
+        d.others.map(o=>`<button data-id="${esc(o.id)}" class="voteBtn ${d.voted&&d.my_guess===o.id?'on':''}" ${d.voted?'disabled':''}>${esc(o.princess)}</button>`).join('')
       }</div>
-      <p class="hint" id="voteMsg" style="margin-top:10px">${d.voted?'투표가 접수되었어요. 바꾸려면 다시 눌러주세요.':''}</p></div>`;
+      <p class="hint" id="voteMsg" style="margin-top:10px">${d.voted?'지목 완료 🤍 한 번 지목한 표는 무를 수 없답니다.':''}</p></div>`;
   }
 
   // 항목별 투표는 각 클래스 초대장 모달 하단으로 이동됨 (invModal 참고)
@@ -503,15 +506,16 @@ async function renderPlayer(id, key){
     });
   }
 
-  if(d.voting_open){
+  if(d.voting_open && !d.voted){
     document.querySelectorAll('.voteBtn').forEach(b=>{
       b.onclick = async ()=>{
+        if(!confirm(`${b.textContent.trim()} 님을 집사의 영애로 지목할까요?\n한 번 지목하면 바꿀 수 없어요.`)) return;
         const g = b.getAttribute('data-id');
         const r = await api('vote', {id, key, guess:g}, true);
         if(r.ok){
-          document.querySelectorAll('.voteBtn').forEach(x=>x.classList.remove('on'));
+          document.querySelectorAll('.voteBtn').forEach(x=>{ x.classList.remove('on'); x.disabled = true; });
           b.classList.add('on');
-          document.getElementById('voteMsg').textContent = '투표가 접수되었어요. 바꾸려면 다시 눌러주세요.';
+          document.getElementById('voteMsg').textContent = '지목 완료 🤍 한 번 지목한 표는 무를 수 없답니다.';
           toast('지목 완료 🤍');
         } else { toast(r.error==='voting_closed'?'투표가 마감되었어요':'오류가 발생했어요'); }
       };
