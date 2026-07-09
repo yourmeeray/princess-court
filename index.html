@@ -637,12 +637,17 @@ async function renderAdmin(key){
   html += `<div class="card"><h2 class="sec">퀴즈 점수 (지혜·매력)</h2>`;
   if(!d.quizzes || !d.quizzes.length){ html += `<p class="muted">Quizzes 탭이 아직 없어요.</p>`; }
   else {
-    html += `<div class="scroll"><table><tr><th>영애</th>${d.quizzes.map(q=>`<th title="${esc(q.gem)} / 최대 ${esc(q.max)}">${esc(q.label||q.quiz_id)}</th>`).join('')}</tr>`;
+    html += `<div class="scroll"><table><tr><th>영애</th>${d.quizzes.map(q=>`<th title="${esc(q.gem)}">${esc(q.label||q.quiz_id)}${q.max!==''&&q.max!=null?`<br><span style="font-size:10px">(${esc(q.max)}점)</span>`:''}</th>`).join('')}</tr>`;
     d.players.forEach(p=>{
       const sc = (d.quiz_scores && d.quiz_scores[p.id]) || {};
-      html += `<tr><td class="name">${esc(p.princess||p.name)}</td>${d.quizzes.map(q=>`<td><input type="number" min="0" ${q.max!==''&&q.max!=null?`max="${esc(q.max)}"`:''} value="${sc[q.quiz_id]!=null?esc(sc[q.quiz_id]):''}" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" class="quizIn"></td>`).join('')}</tr>`;
+      html += `<tr><td class="name">${esc(p.princess||p.name)}</td>${d.quizzes.map(q=>{
+        const v = sc[q.quiz_id];
+        return (q.max!==''&&q.max!=null)
+          ? `<td><input type="checkbox" class="quizOX" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" data-max="${esc(q.max)}" ${Number(v)>0?'checked':''}></td>`
+          : `<td><input type="number" min="0" value="${v!=null?esc(v):''}" data-pid="${esc(p.id)}" data-qid="${esc(q.quiz_id)}" class="quizIn"></td>`;
+      }).join('')}</tr>`;
     });
-    html += `</table></div><p class="hint" style="margin-top:8px">gem이 wit인 퀴즈 합=지혜, charm 합=매력. 숫자를 바꾸면 자동 저장돼요.</p>`;
+    html += `</table></div><p class="hint" style="margin-top:8px">gem이 wit인 퀴즈 합=지혜, charm 합=매력. <b>max(배점)가 있는 퀴즈는 체크=정답(배점 자동 부여), 해제=0점.</b> 배점 없는 퀴즈만 숫자 직접 입력. 바꾸면 자동 저장돼요.</p>`;
   }
   html += `</div>`;
 
@@ -730,6 +735,9 @@ function bindAdmin(key){
   });
   document.querySelectorAll('.quizIn').forEach(inp=>{
     inp.onchange = ()=> save({action:'setQuizScore', player_id:inp.dataset.pid, quiz_id:inp.dataset.qid, value:inp.value});
+  });
+  document.querySelectorAll('.quizOX').forEach(c=>{
+    c.onchange = ()=> save({action:'setQuizScore', player_id:c.dataset.pid, quiz_id:c.dataset.qid, value: c.checked ? c.dataset.max : ''});
   });
   document.querySelectorAll('.qOpen').forEach(c=>{
     c.onchange = ()=> save({action:'setQuizFlag', quiz_id:c.dataset.qid, field:'submit_open', value:c.checked});
