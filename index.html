@@ -174,13 +174,43 @@ function formatCopy(raw){
   flush();
   return out;
 }
-/* 초대장 모달 열기 */
-function invModal(inv){
+/* 초대장 모달 열기 (ctx: 항목투표 컨텍스트) */
+function invModal(inv, ctx){
   if(!inv) return;
+  ctx = ctx || {};
   const meta = [esc(inv.time||''), esc(inv.place||'')].filter(Boolean).join(' · ');
   const hero = inv.image
     ? `<img src="${esc(inv.image)}" class="inv-hero" alt="">`
     : (inv.description ? `<div class="inv-hero copy">${formatCopy(inv.description)}</div>` : '');
+
+  // 이 초대장의 항목 투표 (투표 열림 + 이 초대장이 vote-gem일 때만)
+  let voteHTML = '';
+  const voteGems = String(inv.gem||'').split(',').map(s=>s.trim()).filter(k=>VOTE_GEMS.includes(k));
+  if(ctx.gem_voting_open && voteGems.length){
+    const cand = ctx.others || [];
+    const mgv = ctx.my_gem_votes || {};
+    voteHTML = voteGems.map(gk=>{
+      const g = GEMS.find(x=>x.k===gk);
+      const mv = mgv[gk] || ['','',''];
+      const prompt = inv.vote_prompt || `이 자리에서 ${g?g.ko:''}이 가장 빛난 영애를 1·2·3위로 뽑아주세요.`;
+      const sel = (rank,val)=>`<select class="ivSel" data-cat="${gk}" data-rank="${rank}">
+          <option value="">—</option>
+          ${cand.map(o=>`<option value="${esc(o.id)}" ${String(val)===String(o.id)?'selected':''}>${esc(o.princess)}</option>`).join('')}
+        </select>`;
+      return `<div class="inv-vote" data-cat="${gk}">
+        <div class="inv-sec"><span>${g?g.em+' '+g.ko:''} 투표</span></div>
+        <p class="hint" style="margin-bottom:10px">${esc(prompt)}<br><b>1위 5점 · 2위 3점 · 3위 1점</b> (본인 제외)</p>
+        <div class="row" style="justify-content:center">
+          <span class="muted" style="font-size:12px">1위</span>${sel(1,mv[0])}
+          <span class="muted" style="font-size:12px">2위</span>${sel(2,mv[1])}
+          <span class="muted" style="font-size:12px">3위</span>${sel(3,mv[2])}
+        </div>
+        <div class="center" style="margin-top:12px"><button class="gold sm ivSubmit" data-cat="${gk}">투표 제출</button></div>
+        <p class="hint center ivMsg" style="margin-top:8px">${(mv[0]||mv[1]||mv[2])?'제출 완료 🤍 · 바꾸려면 다시 제출':''}</p>
+      </div>`;
+    }).join('');
+  }
+
   const back = document.createElement('div');
   back.className = 'modal-back';
   back.innerHTML = `<div class="modal-letter">
@@ -191,10 +221,32 @@ function invModal(inv){
     ${hero}
     ${inv.image&&inv.description?`<div class="inv-desc">${formatCopy(inv.description)}</div>`:''}
     ${inv.mission?`<div class="inv-mission">📜 ${esc(inv.mission)}</div>`:''}
+    ${voteHTML}
   </div>`;
   const close = ()=> back.remove();
   back.onclick = e=>{ if(e.target===back) close(); };
   back.querySelector('.modal-x').onclick = close;
+
+  // 같은 항목 안 중복 지명 방지
+  back.querySelectorAll('.ivSel').forEach(s=>{
+    s.onchange = ()=>{ const cat=s.dataset.cat;
+      back.querySelectorAll(`.ivSel[data-cat="${cat}"]`).forEach(x=>{ if(x!==s && x.value && x.value===s.value) x.value=''; }); };
+  });
+  // 투표 제출 → 점수 자동 합계(gemVote)
+  back.querySelectorAll('.ivSubmit').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const cat = btn.dataset.cat;
+      const val = r => (back.querySelector(`.ivSel[data-cat="${cat}"][data-rank="${r}"]`)||{}).value || '';
+      const r = await api('gemVote', {id:ctx.id, key:ctx.key, category:cat, rank1:val(1), rank2:val(2), rank3:val(3)}, true);
+      const msg = back.querySelector(`.inv-vote[data-cat="${cat}"] .ivMsg`);
+      if(r.ok){
+        if(ctx.my_gem_votes) ctx.my_gem_votes[cat] = [val(1),val(2),val(3)];
+        if(msg) msg.textContent = '제출 완료 🤍 · 바꾸려면 다시 제출';
+        toast('투표 저장됨 🤍');
+      } else { toast(r.error==='gem_voting_closed'?'투표가 마감되었어요':'오류가 발생했어요'); }
+    };
+  });
+
   document.body.appendChild(back);
 }
 
@@ -405,26 +457,7 @@ async function renderPlayer(id, key){
       <p class="hint" id="voteMsg" style="margin-top:10px">${d.voted?'투표가 접수되었어요. 바꾸려면 다시 눌러주세요.':''}</p></div>`;
   }
 
-  // 항목별 투표 (각 보석마다 1·2·3위 지명)
-  if(d.gem_voting_open){
-    const cand = d.others || [];
-    html += `<div class="card"><h2 class="sec">항목별 투표</h2>
-      <p class="hint">항목마다 제일 잘한 분을 1·2·3위로 뽑아주세요. <b>1위 5점 · 2위 3점 · 3위 1점</b> (본인 제외). 고르면 자동 저장돼요.</p>`;
-    GEMS.filter(g=>VOTE_GEMS.includes(g.k)).forEach(g=>{
-      const mv = (d.my_gem_votes && d.my_gem_votes[g.k]) || ['','',''];
-      const sel = (rank,val)=>`<select class="gemSel" data-cat="${g.k}" data-rank="${rank}">
-          <option value="">—</option>
-          ${cand.map(o=>`<option value="${esc(o.id)}" ${String(val)===String(o.id)?'selected':''}>${esc(o.princess)}</option>`).join('')}
-        </select>`;
-      html += `<div style="margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:12px">
-         <div style="color:var(--gold);margin-bottom:8px">${g.ko}</div>
-         <div class="row"><span class="muted" style="font-size:12px">1위</span>${sel(1,mv[0])}
-            <span class="muted" style="font-size:12px">2위</span>${sel(2,mv[1])}
-            <span class="muted" style="font-size:12px">3위</span>${sel(3,mv[2])}</div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
+  // 항목별 투표는 각 클래스 초대장 모달 하단으로 이동됨 (invModal 참고)
 
   app.innerHTML = html + logoutBar();
   bindLogout();
@@ -440,9 +473,10 @@ async function renderPlayer(id, key){
     const prev = document.getElementById('invPrev'), next = document.getElementById('invNext');
     if(prev) prev.onclick = ()=> car.scrollBy({left:-step(), behavior:'smooth'});
     if(next) next.onclick = ()=> car.scrollBy({left: step(), behavior:'smooth'});
-    // 봉투 클릭 → 모달로 편지 열기
+    // 봉투 클릭 → 모달로 편지 열기 (+ 항목투표 컨텍스트)
+    const voteCtx = {id, key, gem_voting_open:!!d.gem_voting_open, others:d.others||[], my_gem_votes:d.my_gem_votes||{}};
     car.querySelectorAll('.inv-slide.env').forEach(el=>{
-      const open = ()=> invModal(d.invitations[+el.dataset.idx]);
+      const open = ()=> invModal(d.invitations[+el.dataset.idx], voteCtx);
       el.onclick = open;
       el.onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } };
     });
@@ -459,22 +493,6 @@ async function renderPlayer(id, key){
           document.getElementById('voteMsg').textContent = '투표가 접수되었어요. 바꾸려면 다시 눌러주세요.';
           toast('지목 완료 🤍');
         } else { toast(r.error==='voting_closed'?'투표가 마감되었어요':'오류가 발생했어요'); }
-      };
-    });
-  }
-
-  if(d.gem_voting_open){
-    const saveCat = async (cat)=>{
-      const val = r => (document.querySelector(`.gemSel[data-cat="${cat}"][data-rank="${r}"]`)||{}).value || '';
-      const r = await api('gemVote', {id, key, category:cat, rank1:val(1), rank2:val(2), rank3:val(3)}, true);
-      toast(r.ok ? '투표 저장됨 🤍' : (r.error==='gem_voting_closed'?'투표가 마감되었어요':'오류가 발생했어요'));
-    };
-    document.querySelectorAll('.gemSel').forEach(s=>{
-      s.onchange = ()=>{
-        const cat = s.dataset.cat;
-        // 같은 항목 안 중복 지명 방지: 방금 고른 값과 겹치는 다른 칸 비우기
-        document.querySelectorAll(`.gemSel[data-cat="${cat}"]`).forEach(x=>{ if(x!==s && x.value && x.value===s.value) x.value=''; });
-        saveCat(cat);
       };
     });
   }
