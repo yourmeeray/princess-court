@@ -189,6 +189,7 @@ function invModal(inv, ctx){
   if(ctx.gem_voting_open && voteGems.length){
     const cand = ctx.others || [];
     const mgv = ctx.my_gem_votes || {};
+    const RP = ctx.rank_points || [5,3,1];
     voteHTML = voteGems.map(gk=>{
       const g = GEMS.find(x=>x.k===gk);
       const mv = mgv[gk] || ['','',''];
@@ -199,7 +200,7 @@ function invModal(inv, ctx){
         </select>`;
       return `<div class="inv-vote" data-cat="${gk}">
         <div class="inv-sec"><span>${g?g.em+' '+g.ko:''} 투표</span></div>
-        <p class="hint" style="margin-bottom:10px">${esc(prompt)}<br><b>1위 5점 · 2위 3점 · 3위 1점</b> (본인 제외)</p>
+        <p class="hint" style="margin-bottom:10px">${esc(prompt)}<br><b>1위 ${RP[0]}점 · 2위 ${RP[1]}점 · 3위 ${RP[2]}점</b> (본인 제외)</p>
         <div class="row" style="justify-content:center">
           <span class="muted" style="font-size:12px">1위</span>${sel(1,mv[0])}
           <span class="muted" style="font-size:12px">2위</span>${sel(2,mv[1])}
@@ -474,7 +475,7 @@ async function renderPlayer(id, key){
     if(prev) prev.onclick = ()=> car.scrollBy({left:-step(), behavior:'smooth'});
     if(next) next.onclick = ()=> car.scrollBy({left: step(), behavior:'smooth'});
     // 봉투 클릭 → 모달로 편지 열기 (+ 항목투표 컨텍스트)
-    const voteCtx = {id, key, gem_voting_open:!!d.gem_voting_open, others:d.others||[], my_gem_votes:d.my_gem_votes||{}};
+    const voteCtx = {id, key, gem_voting_open:!!d.gem_voting_open, others:d.others||[], my_gem_votes:d.my_gem_votes||{}, rank_points:d.rank_points};
     car.querySelectorAll('.inv-slide.env').forEach(el=>{
       const open = ()=> invModal(d.invitations[+el.dataset.idx], voteCtx);
       el.onclick = open;
@@ -591,7 +592,7 @@ async function renderAdmin(key){
       const txt = list.length ? list.map((x,i)=>`${i+1}. ${esc(x.name)} (${x.points})`).join(' · ') : '<span class="muted">아직 투표 없음</span>';
       return `<tr><td>${g.em} ${g.ko}</td><td class="name">${txt}</td></tr>`;
     }).join('')}
-  </table></div><p class="hint" style="margin-top:8px">1위 5점 · 2위 3점 · 3위 1점.</p></div>`;
+  </table></div><p class="hint" style="margin-top:8px">${(()=>{const rp=String(d.config.rank_points||'5,3,1').split(',');return `1위 ${rp[0]}점 · 2위 ${rp[1]}점 · 3위 ${rp[2]}점.`})()} (Config rank_points로 조정)</p></div>`;
 
   // 초대장 공개
   html += `<div class="card"><h2 class="sec">초대장 공개</h2>`;
