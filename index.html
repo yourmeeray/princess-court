@@ -453,7 +453,7 @@ async function renderPlayer(id, key){
   // 비밀 미션 (집사의 영애만)
   if(d.is_owner){
     html += `<div class="card"><div class="mission"><div class="h">🤫 집사의 영애 — 비밀 임무</div>
-      <p style="line-height:1.8">${esc(d.mission||'(임무가 곧 전달됩니다)')}</p>
+      <p style="line-height:1.8">${esc(d.mission||'(임무가 곧 전달됩니다)').replace(/\n/g,'<br>')}</p>
       <p class="hint" style="margin-top:10px">상태: <b>${esc(d.mission_status||'진행 중')}</b><br>아무에게도 들키지 마세요. 끝까지 정체를 숨기시길.</p></div></div>`;
   }
 
